@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Light Propagation Simulator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Diffraction experiments</h1>
+    </header>
+    <div class="cards">
+      <a href="canvas2d.html">
+        <strong>Canvas 2D</strong>
+        Plain JavaScript sums the steady-state wave on the CPU and draws it as an image.
+      </a>
+      <a href="webgl.html">
+        <strong>WebGL</strong>
+        The same sum runs as a shader on the GPU, so larger grids fill in quickly.
+      </a>
+    </div>
+    <header>
+      <h1>Earlier: time-stepped double slit</h1>
+    </header>
+    <div class="cards">
+      <a href="transient/canvas2d.html">
+        <strong>Canvas 2D, time-stepped</strong>
+        Steps the wave equation forward, so you watch the wave arrive and settle.
+      </a>
+      <a href="transient/webgl.html">
+        <strong>WebGL, time-stepped</strong>
+        The same time-stepping on the GPU.
+      </a>
+    </div>
+  </body>
+</html>
