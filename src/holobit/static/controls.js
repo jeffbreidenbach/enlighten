@@ -83,10 +83,10 @@ export function createControls(panel, { onChange }) {
 
   const buttons = document.createElement("div");
   buttons.className = "buttons";
-  const view = Object.assign(document.createElement("button"), { textContent: "Show planes" });
+  const view = Object.assign(document.createElement("button"), { textContent: "Full View" });
   view.addEventListener("click", () => {
     params.view = params.view === "slice" ? "planes" : "slice";
-    view.textContent = params.view === "slice" ? "Show planes" : "Show slice";
+    view.textContent = params.view === "slice" ? "Full View" : "Cross Section";
   });
   const pause = Object.assign(document.createElement("button"), { textContent: "Pause" });
   pause.addEventListener("click", () => {
