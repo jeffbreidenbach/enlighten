@@ -55,8 +55,8 @@ const GRATING_PERIOD = DEFAULT_WAVELENGTH * CELLS_PER_NM * Math.SQRT2;
 // one is an opening at a fixed height: [center offset, half width], in
 // base cells. At 550 nm a wavelength is 4 base cells.
 const OPENINGS = {
-  // 5 wavelengths wide.
-  single: [[0, 10]],
+  // 1 wavelength wide, the same as each slit of the double slit.
+  single: [[0, 2]],
   // 1 wavelength wide, 10 wavelengths apart.
   double: [
     [-20, 2],

@@ -7,14 +7,13 @@ import { APERTURES, DEFAULT_WAVELENGTH } from "./optics.js";
 
 export function createControls(panel, { onChange }) {
   const params = {
-    aperture: "double",
+    aperture: "single",
     light: "point",
     wavelength: DEFAULT_WAVELENGTH,
     sourceHeight: 0,
     beamAngle: 45,
     view: "slice",
   };
-  let paused = false;
 
   const apRow = row(panel, "Aperture");
   const apSelect = document.createElement("select");
@@ -88,45 +87,11 @@ export function createControls(panel, { onChange }) {
     params.view = params.view === "slice" ? "planes" : "slice";
     view.textContent = params.view === "slice" ? "Full View" : "Cross Section";
   });
-  const pause = Object.assign(document.createElement("button"), { textContent: "Pause" });
-  pause.addEventListener("click", () => {
-    paused = !paused;
-    pause.textContent = paused ? "Play" : "Pause";
-  });
-  buttons.append(view, pause);
+  buttons.append(view);
 
-  const stats = document.createElement("p");
-  stats.className = "stats";
-  panel.append(buttons, stats);
+  panel.append(buttons);
 
-  let frames = 0;
-  let last = performance.now();
-  let fps = 0;
-  let computeText = "";
-  const show = () => (stats.textContent = `${fps} fps${computeText}`);
-
-  return {
-    params,
-    get paused() {
-      return paused;
-    },
-    // Call once per drawn frame.
-    frame() {
-      frames += 1;
-      const now = performance.now();
-      if (now - last >= 500) {
-        fps = Math.round((frames * 1000) / (now - last));
-        frames = 0;
-        last = now;
-        show();
-      }
-    },
-    // Call when the light has finished computing.
-    computed(ms) {
-      computeText = ` · light computed in ${Math.round(ms)} ms`;
-      show();
-    },
-  };
+  return { params };
 }
 
 function row(panel, label) {

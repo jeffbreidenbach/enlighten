@@ -560,7 +560,7 @@ function startCompute() {
   // Rough sums per pixel: one per slit row, or for the lenses one per
   // point averaged around each ring (see the shader).
   const perPixel = ap.lens ? ap.count * (8 + 0.4 * g.k * ap.lens.radius) : ap.count;
-  job = { fieldRow: 0, screenRow: 0, perPixel, started: performance.now() };
+  job = { fieldRow: 0, screenRow: 0, perPixel };
 }
 
 // Does one frame's share of the calculation, finishing it if it can.
@@ -586,7 +586,6 @@ function continueCompute() {
   for (let i = 2; i < readBack.length; i += 4) maxI = Math.max(maxI, readBack[i]);
   U.uMaxI.value = maxI;
   runPass(screenColorPass, screenColorRT);
-  controls.computed(performance.now() - job.started);
   job = null;
 }
 
@@ -607,13 +606,12 @@ function frame(now) {
   const step = dt / TRANSITION;
   viewT = target > viewT ? Math.min(target, viewT + step) : Math.max(target, viewT - step);
 
-  if (!controls.paused) phase += phaseStep(g);
+  phase += phaseStep(g);
   uPhase.value.set(Math.cos(phase), Math.sin(phase));
   resize();
   layout(viewT);
   runPass(sliceColorPass, sliceColorRT);
   renderer.render(scene, camera);
-  controls.frame();
   requestAnimationFrame(frame);
 }
 
