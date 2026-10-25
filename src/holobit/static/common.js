@@ -7,8 +7,8 @@
 // Animating only advances the phase, so the pattern is settled from the
 // first frame and nothing ever reflects.
 
-export const BASE_W = 480;
-export const BASE_H = 300;
+const BASE_W = 480;
+const BASE_H = 300;
 
 // Grid cells per nanometre of wavelength at 1x, so 550 nm is 16 cells.
 const CELLS_PER_NM = 16 / 550;
@@ -44,10 +44,13 @@ export const ROW_WALL = 0;
 export const ROW_OPEN = 1;
 export const ROW_LENS = 2;
 
-// Sizes are set for the 1x grid; higher resolutions scale everything
-// up so the scene looks the same, just with finer cells.
+// Grid cells per base cell. Sizes below are set for the 480x300 base
+// grid; raising this scales everything up so the scene looks the same,
+// just with finer cells.
+const SCALE = 1;
+
 export function geometry(params) {
-  const r = params.resolution;
+  const r = SCALE;
   const W = BASE_W * r;
   const H = BASE_H * r;
   return {
@@ -142,7 +145,7 @@ export function wavelengthColor(nm) {
 // Builds the control panel. Any change calls onChange, which recomputes
 // the field.
 export function createControls(panel, { onChange }) {
-  const params = { aperture: "double", resolution: 1, wavelength: 550 };
+  const params = { aperture: "double", wavelength: 550 };
   let paused = false;
 
   const apRow = row(panel, "Aperture");
@@ -154,17 +157,6 @@ export function createControls(panel, { onChange }) {
     onChange();
   });
   apRow.append(apSelect);
-
-  const resRow = row(panel, "Resolution");
-  const resSelect = document.createElement("select");
-  for (const r of [1, 2, 3, 4]) {
-    resSelect.add(new Option(`${r}× (${BASE_W * r}×${BASE_H * r})`, r));
-  }
-  resSelect.addEventListener("change", () => {
-    params.resolution = Number(resSelect.value);
-    onChange();
-  });
-  resRow.append(resSelect);
 
   const waveRow = row(panel, "Wavelength");
   const input = Object.assign(document.createElement("input"), {

@@ -29,11 +29,11 @@ let g, ap, openRows, fieldRe, fieldIm, nextRow, started, image;
 let phase = 0;
 
 function restart() {
-  const resized = !g || g.r !== params.resolution;
+  const first = !g;
   g = geometry(params);
   ap = aperture(params, g);
   openRows = Int32Array.from(ap.kind.keys()).filter((y) => ap.kind[y] !== ROW_WALL);
-  if (resized) {
+  if (first) {
     canvas.width = g.W + g.stripW;
     canvas.height = g.H;
     fieldRe = new Float32Array(g.W * g.H);

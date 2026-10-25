@@ -160,13 +160,11 @@ let maxI = 1e-9;
 let phase = 0;
 
 function restart() {
-  const resized = !g || g.r !== params.resolution;
+  const first = !g;
   g = geometry(params);
-  if (resized) {
+  if (first) {
     canvas.width = g.W + g.stripW;
     canvas.height = g.H;
-    if (fieldTex) gl.deleteTexture(fieldTex);
-    if (fieldFbo) gl.deleteFramebuffer(fieldFbo);
     fieldTex = floatTexture(g.W, g.H, null);
     fieldFbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fieldFbo);
