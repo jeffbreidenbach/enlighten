@@ -216,10 +216,14 @@ void main() {
     } else if (distance(c, vec2(uSrcX, uCenterY + uSrcH)) <= 3.0 * uR) {
       rgb = vec3(1.0);
     } else {
-      // Crests light up in the wavelength's color; troughs stay dark.
+      // Each wave is a smooth cosine: brightest at the crest, dark in the
+      // trough. How strong the light is sets the overall brightness,
+      // compressed so weak light still shows.
       vec2 f = texelFetch(uField, ivec2(c), 0).xy;
-      float v = tanh(clamp(${GAIN.toFixed(1)} * dot(f, uPhase), -10.0, 10.0));
-      rgb = uHue * max(v, 0.0) * beam(c);
+      float amp = length(f);
+      float shade = 0.5 + 0.5 * dot(f, uPhase) / max(amp, 1e-6);
+      float strength = tanh(min(${GAIN.toFixed(1)} * amp, 10.0));
+      rgb = uHue * shade * strength * beam(c);
     }
   } else if (c.x >= uW + 2.0 * uR) {
     // The screen strip: the center line of the screen plane.

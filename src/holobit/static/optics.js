@@ -22,8 +22,8 @@ const SCALE = 1;
 // Grid cells per nanometre of wavelength, so 550 nm is 16 cells.
 const CELLS_PER_NM = 16 / 550;
 // How far crests move per drawn frame, in cells of the base grid.
-const SPEED = 1.5;
-// How strongly wave values map to brightness.
+const SPEED = 0.375;
+// How strongly the light's strength maps to brightness.
 export const GAIN = 2.5;
 
 export const BG = [6, 8, 14];
@@ -47,7 +47,9 @@ const OPENINGS = {
     [-30, 4],
     [30, 4],
   ],
-  grating: [-3, -2, -1, 0, 1, 2, 3].map((n) => [n * 30, 3]),
+  // 50% open: a 30-cell period, 15 open and 15 blocked. The period is
+  // fine enough that only the zero and first orders leave the grating.
+  grating: [-3, -2, -1, 0, 1, 2, 3].map((n) => [n * 30, 7.5]),
 };
 // Round lenses with this radius, centered at these heights in base cells.
 // Two lenses are superimposed: where they overlap, the aperture passes
