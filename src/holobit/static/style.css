@@ -11,8 +11,15 @@
   box-sizing: border-box;
 }
 
+/* The page fills the window exactly; the canvas takes whatever space the
+   header and controls leave, so nothing ever scrolls. */
 body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
   margin: 0;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font: 15px/1.4 system-ui, sans-serif;
@@ -44,21 +51,29 @@ a {
 }
 
 main {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   padding: 0 16px 16px;
 }
 
 @media (max-width: 800px) {
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 }
 
+/* A canvas with a fixed-size image (the time-stepped pages) keeps its
+   shape inside the space; the three.js canvas resizes to fill it. */
 canvas {
+  display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   background: var(--bg);
   border-radius: 6px;
 }
@@ -71,6 +86,8 @@ aside {
   border-radius: 6px;
   background: var(--panel);
   align-self: start;
+  max-height: 100%;
+  overflow: auto;
 }
 
 .row {
@@ -113,27 +130,4 @@ select {
 .error {
   padding: 16px;
   color: #ff8080;
-}
-
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-  padding: 0 16px 16px;
-  max-width: 900px;
-}
-
-.cards a {
-  display: block;
-  padding: 16px;
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  text-decoration: none;
-}
-
-.cards a strong {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--accent);
 }
