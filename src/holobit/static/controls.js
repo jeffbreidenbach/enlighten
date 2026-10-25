@@ -1,12 +1,18 @@
-// The control panel. Changing the aperture, wavelength or source height
-// calls onChange,
+// The control panel. Changing the aperture, light, wavelength or source
+// height calls onChange,
 // which recomputes the light; the view button switches between the flat
 // slice and the oblique view of the planes.
 
 import { APERTURES } from "./optics.js";
 
 export function createControls(panel, { onChange }) {
-  const params = { aperture: "double", wavelength: 550, sourceHeight: 0, view: "slice" };
+  const params = {
+    aperture: "double",
+    light: "point",
+    wavelength: 550,
+    sourceHeight: 0,
+    view: "slice",
+  };
   let paused = false;
 
   const apRow = row(panel, "Aperture");
@@ -18,6 +24,18 @@ export function createControls(panel, { onChange }) {
     onChange();
   });
   apRow.append(apSelect);
+
+  // A plane wave comes from far off in the source's direction, so the
+  // source height slider tilts it.
+  const lightRow = row(panel, "Light");
+  const lightSelect = document.createElement("select");
+  lightSelect.add(new Option("Point source", "point"));
+  lightSelect.add(new Option("Plane wave", "plane"));
+  lightSelect.addEventListener("change", () => {
+    params.light = lightSelect.value;
+    onChange();
+  });
+  lightRow.append(lightSelect);
 
   const slider = (label, key, { min, max, step, format }) => {
     const input = Object.assign(document.createElement("input"), {

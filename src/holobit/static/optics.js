@@ -77,15 +77,25 @@ export function geometry(params) {
   const stripW = 20 * r;
   // The screen plane sits in the strip to the right of the slice.
   const screenX = W + stripW / 2 + r;
+  const srcX = Math.round(W * 0.12);
+  const barrierX = Math.round(W * 0.4);
+  const srcH = params.sourceHeight * r;
+  // A plane wave travels as if from a far-off source in the direction of
+  // the source point, so raising the source tilts it. This is its
+  // direction of travel within the slice.
+  const toPlane = Math.hypot(barrierX - srcX, srcH);
   return {
     r,
     W,
     H,
     stripW,
-    srcX: Math.round(W * 0.12),
+    srcX,
     // Height of the source above the axis, within the slice.
-    srcH: params.sourceHeight * r,
-    barrierX: Math.round(W * 0.4),
+    srcH,
+    plane: params.light === "plane",
+    dirX: (barrierX - srcX) / toPlane,
+    dirY: -srcH / toPlane,
+    barrierX,
     barrierHalf: r,
     centerY: H / 2,
     screenX,
@@ -127,7 +137,8 @@ export function lensGroove(g, rho) {
 //   light at each point itself.
 // re and im are the wavelet's strength and phase; for slits they include
 // the light arriving from the source. Light is scaled so the incoming
-// wave has strength 1 where it meets the aperture on the axis.
+// wave has strength 1 where it meets the aperture on the axis; a plane
+// wave has strength 1 everywhere.
 export function aperture(params, g) {
   const lensCenters = (LENS_CENTERS[params.aperture] ?? []).map((c) => c * g.r);
   const lens = lensCenters.length > 0;
@@ -151,9 +162,15 @@ export function aperture(params, g) {
     if (!open) continue;
     kind[y] = ROW_OPEN;
     // Strength sqrt(k / 2pi) and a 45 degree lag from summing along the
-    // slit; 1/sqrt(R) is what remains of the source's fall-off.
-    const R = Math.hypot(s0, dy - g.srcH);
-    list.push([dy, (Math.sqrt(g.k / (2 * Math.PI)) * s0) / Math.sqrt(R), g.k * R - Math.PI / 4, R]);
+    // slit. For a point source, 1/sqrt(R) is what remains of its
+    // fall-off; a plane wave just arrives with its tilt's phase.
+    const amp = Math.sqrt(g.k / (2 * Math.PI));
+    if (g.plane) {
+      list.push([dy, amp, g.k * g.dirY * dy - Math.PI / 4, 0]);
+    } else {
+      const R = Math.hypot(s0, dy - g.srcH);
+      list.push([dy, (amp * s0) / Math.sqrt(R), g.k * R - Math.PI / 4, R]);
+    }
   }
 
   for (const center of lensCenters) {

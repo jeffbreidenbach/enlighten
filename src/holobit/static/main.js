@@ -81,6 +81,10 @@ const OPTICS = `
 uniform sampler2D uSources, uRows;
 uniform float uK, uSrcX, uSrcH, uBarrierX, uBarrierHalf, uCenterY;
 uniform int uMode, uCount;
+// uPlane is 1 for a plane wave travelling in direction uDir (x along the
+// axis, y up), 0 for the point source.
+uniform int uPlane;
+uniform vec2 uDir;
 
 const float TAU = 6.28318531;
 
@@ -99,9 +103,12 @@ vec2 wavelet(float r, float dx) {
   return 0.5 * (1.0 + dx / r) / r * wave(r);
 }
 
-// The source's spherical wave, strength 1 where it meets the aperture on
-// the axis. d is the distance from the source.
-vec2 incident(float d) {
+// The light arriving from the source at a point. The point source's
+// spherical wave has strength 1 where it meets the aperture on the axis;
+// the plane wave has strength 1 everywhere and phase 0 there.
+vec2 incident(float x, vec2 p) {
+  if (uPlane == 1) return wave(uDir.x * (x - uBarrierX) + uDir.y * p.y);
+  float d = length(vec3(x - uSrcX, p.x, p.y - uSrcH));
   return (uBarrierX - uSrcX) / max(d, 0.5) * wave(d);
 }
 
@@ -109,7 +116,7 @@ vec2 fieldAt(float x, vec2 p) {
   bool inWall = abs(x - uBarrierX) <= uBarrierHalf;
   if (x < uBarrierX - uBarrierHalf ||
       (inWall && texelFetch(uRows, ivec2(int(p.y + uCenterY), 0), 0).x != ${f1(ROW_WALL)})) {
-    return incident(length(vec3(x - uSrcX, p.x, p.y - uSrcH)));
+    return incident(x, p);
   }
   if (inWall) return vec2(0.0);
 
@@ -130,23 +137,27 @@ vec2 fieldAt(float x, vec2 p) {
       float toSrc2 = s0 * s0 + hc * hc + rho * rho;
       // The phase swings by about this much around the ring, so that many
       // points (plus a margin) is enough for an accurate average.
-      float swing = uK * rho * (length(pc) / sqrt(toP2) + abs(hc) / sqrt(toSrc2));
+      float tilt = uPlane == 1 ? abs(uDir.y) : abs(hc) / sqrt(toSrc2);
+      float swing = uK * rho * (length(pc) / sqrt(toP2) + tilt);
       int n = min(int(swing) + 8, 256);
       vec2 sum = vec2(0.0);
       for (int j = 0; j < n; j++) {
         float phi = (float(j) + 0.5) * TAU / float(n);
         vec2 q = rho * vec2(cos(phi), sin(phi));
         float r = sqrt(toP2 - 2.0 * dot(pc, q));
-        float fromSrc = sqrt(toSrc2 - 2.0 * hc * q.y);
-        sum += cmul(incident(fromSrc), wavelet(r, dx));
+        vec2 arriving = incident(uBarrierX, vec2(q.x, s.w + q.y));
+        sum += cmul(arriving, wavelet(r, dx));
       }
       u += cmul(s.yz, sum / float(n));
     } else {
       // A full-width slit row at height s.x, summed along its length.
+      // That sum fades as 1/sqrt(r * (R + r)) for a point source R away,
+      // and as 1/sqrt(r) for a plane wave.
       float y = p.y;
       float dy = y - s.x;
       float r = sqrt(dx * dx + dy * dy);
-      u += sqrt(r / (s.w + r)) * cmul(s.yz, wavelet(r, dx));
+      float spread = uPlane == 1 ? sqrt(r) : sqrt(r / (s.w + r));
+      u += spread * cmul(s.yz, wavelet(r, dx));
     }
   }
   return u;
@@ -187,22 +198,34 @@ uniform sampler2D uField, uRows, uScreen;
 uniform vec2 uPhase;
 uniform vec3 uHue;
 uniform float uMaxI, uW, uR, uSrcX, uSrcH, uCenterY, uBarrierX, uBarrierHalf;
+uniform int uPlane;
+uniform vec2 uDir;
 out vec4 outColor;
 
-// The source shines like a flashlight aimed at the aperture plane: before
-// the plane, light shows only inside the wedge from the source to the
-// plane's top and bottom edges. 1 inside, 0 outside, with a soft edge.
-// Only the drawing changes; the plane is fully lit either way.
+// The light is drawn as a beam aimed at the aperture plane: before the
+// plane, it shows only where it is headed for the plane. For the point
+// source that is the wedge from the source to the plane's top and bottom
+// edges; for the plane wave, the band of parallel rays that hit it.
+// 1 inside, 0 outside, with a soft edge. Only the drawing changes; the
+// plane is fully lit either way.
 float beam(vec2 c) {
-  float toPlane = uBarrierX - uSrcX;
-  float along = c.x - uSrcX;
   if (c.x >= uBarrierX - uBarrierHalf) return 1.0;
-  if (along <= 0.0) return 0.0;
-  // Where the ray from the source through c meets the plane, and how far
-  // inside the plane's edges that is, scaled back to c's distance.
-  float srcY = uCenterY + uSrcH;
-  float hit = srcY + (c.y - srcY) * toPlane / along;
-  float inside = min(hit, 2.0 * uCenterY - hit) * along / toPlane;
+  float hit, scale;
+  if (uPlane == 1) {
+    // Where the ray through c meets the plane.
+    hit = c.y + uDir.y / uDir.x * (uBarrierX - c.x);
+    scale = 1.0;
+  } else {
+    // Where the ray from the source through c meets the plane, and how
+    // much closer together rays are at c than at the plane.
+    float toPlane = uBarrierX - uSrcX;
+    float along = c.x - uSrcX;
+    if (along <= 0.0) return 0.0;
+    float srcY = uCenterY + uSrcH;
+    hit = srcY + (c.y - srcY) * toPlane / along;
+    scale = along / toPlane;
+  }
+  float inside = min(hit, 2.0 * uCenterY - hit) * scale;
   return smoothstep(-1.5, 1.5, inside);
 }
 
@@ -213,7 +236,7 @@ void main() {
     vec4 row = texelFetch(uRows, ivec2(int(c.y), 0), 0);
     if (abs(c.x - uBarrierX) <= uBarrierHalf && row.x != ${f1(ROW_OPEN)}) {
       rgb = row.x == ${f1(ROW_WALL)} ? ${vec3(WALL)} : ${vec3(GLASS)} * (0.45 + 0.55 * row.y);
-    } else if (distance(c, vec2(uSrcX, uCenterY + uSrcH)) <= 3.0 * uR) {
+    } else if (uPlane == 0 && distance(c, vec2(uSrcX, uCenterY + uSrcH)) <= 3.0 * uR) {
       rgb = vec3(1.0);
     } else {
       // Each wave is a smooth cosine: brightest at the crest, dark in the
@@ -274,6 +297,8 @@ const U = {
   uK: { value: g.k },
   uSrcX: { value: g.srcX },
   uSrcH: { value: g.srcH },
+  uPlane: { value: 0 },
+  uDir: { value: new THREE.Vector2(1, 0) },
   uBarrierX: { value: g.barrierX },
   uBarrierHalf: { value: g.barrierHalf },
   uCenterY: { value: g.centerY },
@@ -376,15 +401,20 @@ function makePlane(x, texture) {
 
 const sourceTex = canvasTexture(g.H);
 
-// Draws the source plane: faintly tinted, with a glow at the source.
+// Draws the source plane: faintly tinted, with a glow at the point source,
+// or evenly lit for a plane wave, which comes from no single point.
 function drawSource() {
   const ctx = sourceTex.image.getContext("2d");
   const mid = g.H / 2;
   // Canvas rows run top down, so raising the source moves it up the canvas.
   const y = mid - g.srcH;
   ctx.clearRect(0, 0, g.H, g.H);
-  ctx.fillStyle = "rgba(150, 170, 220, 0.06)";
+  ctx.fillStyle = g.plane ? "rgba(255, 255, 255, 0.18)" : "rgba(150, 170, 220, 0.06)";
   ctx.fillRect(0, 0, g.H, g.H);
+  if (g.plane) {
+    sourceTex.needsUpdate = true;
+    return;
+  }
   const glow = ctx.createRadialGradient(mid, y, 0, mid, y, g.H * 0.08);
   glow.addColorStop(0, "rgba(255, 255, 255, 1)");
   glow.addColorStop(1, "rgba(255, 255, 255, 0)");
@@ -485,6 +515,8 @@ function compute() {
   U.uSources.value = sourcesTex;
   U.uK.value = g.k;
   U.uSrcH.value = g.srcH;
+  U.uPlane.value = g.plane ? 1 : 0;
+  U.uDir.value.set(g.dirX, g.dirY);
   U.uMode.value = ap.mode;
   U.uCount.value = ap.count;
   U.uHue.value.set(...wavelengthColor(params.wavelength).map((c) => c / 255));
