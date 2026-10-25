@@ -1,16 +1,17 @@
-// The control panel. Changing the aperture, light, wavelength or source
-// height calls onChange,
-// which recomputes the light; the view button switches between the flat
-// slice and the oblique view of the planes.
+// The control panel. Changing the aperture, light, wavelength, source
+// height or beam angle calls onChange, which recomputes the light; the
+// view button switches between the flat slice and the oblique view of the
+// planes.
 
-import { APERTURES } from "./optics.js";
+import { APERTURES, DEFAULT_WAVELENGTH } from "./optics.js";
 
 export function createControls(panel, { onChange }) {
   const params = {
     aperture: "double",
     light: "point",
-    wavelength: 550,
+    wavelength: DEFAULT_WAVELENGTH,
     sourceHeight: 0,
+    beamAngle: 45,
     view: "slice",
   };
   let paused = false;
@@ -25,14 +26,19 @@ export function createControls(panel, { onChange }) {
   });
   apRow.append(apSelect);
 
-  // A plane wave comes from far off in the source's direction, so the
-  // source height slider tilts it.
+  // The point source is placed by its height; the plane wave is aimed by
+  // its angle. Only the slider for the chosen light shows.
   const lightRow = row(panel, "Light");
   const lightSelect = document.createElement("select");
   lightSelect.add(new Option("Point source", "point"));
   lightSelect.add(new Option("Plane wave", "plane"));
+  const showLightSlider = () => {
+    heightRow.hidden = params.light !== "point";
+    angleRow.hidden = params.light !== "plane";
+  };
   lightSelect.addEventListener("change", () => {
     params.light = lightSelect.value;
+    showLightSlider();
     onChange();
   });
   lightRow.append(lightSelect);
@@ -51,17 +57,29 @@ export function createControls(panel, { onChange }) {
       out.value = format(params[key]);
       onChange();
     });
-    row(panel, label).append(input, out);
+    const r = row(panel, label);
+    r.append(input, out);
+    return r;
   };
 
   slider("Wavelength", "wavelength", { min: 400, max: 700, step: 10, format: (v) => `${v} nm` });
-  // In grid cells above the axis; the planes are 300 cells tall.
-  slider("Source height", "sourceHeight", {
-    min: -100,
-    max: 100,
-    step: 5,
-    format: (v) => (v > 0 ? `+${v}` : `${v}`),
+  const signed = (v) => (v > 0 ? `+${v}` : `${v}`);
+  // In base cells above the axis, up to the aperture plane's edge (it is
+  // 80 cells tall).
+  const heightRow = slider("Source height", "sourceHeight", {
+    min: -40,
+    max: 40,
+    step: 2,
+    format: signed,
   });
+  // Degrees from the axis; positive comes from above.
+  const angleRow = slider("Beam angle", "beamAngle", {
+    min: -60,
+    max: 60,
+    step: 1,
+    format: (v) => `${signed(v)}°`,
+  });
+  showLightSlider();
 
   const buttons = document.createElement("div");
   buttons.className = "buttons";

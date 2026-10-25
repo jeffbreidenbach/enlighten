@@ -15,6 +15,7 @@ import {
   GAIN,
   GLASS,
   MODE_LENS,
+  ROW_LENS,
   ROW_OPEN,
   ROW_WALL,
   WALL,
@@ -114,8 +115,9 @@ vec2 incident(float x, vec2 p) {
 
 vec2 fieldAt(float x, vec2 p) {
   bool inWall = abs(x - uBarrierX) <= uBarrierHalf;
+  float kind = inWall ? texelFetch(uRows, ivec2(int(p.y + uCenterY), 0), 0).x : 0.0;
   if (x < uBarrierX - uBarrierHalf ||
-      (inWall && texelFetch(uRows, ivec2(int(p.y + uCenterY), 0), 0).x != ${f1(ROW_WALL)})) {
+      (inWall && (kind == ${f1(ROW_OPEN)} || kind == ${f1(ROW_LENS)}))) {
     return incident(x, p);
   }
   if (inWall) return vec2(0.0);
@@ -197,17 +199,17 @@ const SLICE_COLOR = `${HEAD}
 uniform sampler2D uField, uRows, uScreen;
 uniform vec2 uPhase;
 uniform vec3 uHue;
-uniform float uMaxI, uW, uR, uSrcX, uSrcH, uCenterY, uBarrierX, uBarrierHalf;
+uniform float uMaxI, uW, uR, uSrcX, uSrcH, uCenterY, uBarrierX, uBarrierHalf, uApertureHalf;
 uniform int uPlane;
 uniform vec2 uDir;
 out vec4 outColor;
 
-// The light is drawn as a beam aimed at the aperture plane: before the
-// plane, it shows only where it is headed for the plane. For the point
-// source that is the wedge from the source to the plane's top and bottom
-// edges; for the plane wave, the band of parallel rays that hit it.
-// 1 inside, 0 outside, with a soft edge. Only the drawing changes; the
-// plane is fully lit either way.
+// The light is a beam aimed at the aperture plane: before the plane, it
+// shows only where it is headed for the plane. For the point source that
+// is the wedge from the source to the plane's top and bottom edges; for
+// the plane wave, the band of parallel rays that hit it. 1 inside, 0
+// outside, with a soft edge. The sums only use light that reaches the
+// plane, so this matches them.
 float beam(vec2 c) {
   if (c.x >= uBarrierX - uBarrierHalf) return 1.0;
   float hit, scale;
@@ -225,7 +227,7 @@ float beam(vec2 c) {
     hit = srcY + (c.y - srcY) * toPlane / along;
     scale = along / toPlane;
   }
-  float inside = min(hit, 2.0 * uCenterY - hit) * scale;
+  float inside = min(hit - (uCenterY - uApertureHalf), uCenterY + uApertureHalf - hit) * scale;
   return smoothstep(-1.5, 1.5, inside);
 }
 
@@ -234,7 +236,8 @@ void main() {
   vec3 rgb = vec3(0.0);
   if (c.x < uW) {
     vec4 row = texelFetch(uRows, ivec2(int(c.y), 0), 0);
-    if (abs(c.x - uBarrierX) <= uBarrierHalf && row.x != ${f1(ROW_OPEN)}) {
+    bool drawn = row.x == ${f1(ROW_WALL)} || row.x == ${f1(ROW_LENS)};
+    if (abs(c.x - uBarrierX) <= uBarrierHalf && drawn) {
       rgb = row.x == ${f1(ROW_WALL)} ? ${vec3(WALL)} : ${vec3(GLASS)} * (0.45 + 0.55 * row.y);
     } else if (uPlane == 0 && distance(c, vec2(uSrcX, uCenterY + uSrcH)) <= 3.0 * uR) {
       rgb = vec3(1.0);
@@ -302,6 +305,7 @@ const U = {
   uBarrierX: { value: g.barrierX },
   uBarrierHalf: { value: g.barrierHalf },
   uCenterY: { value: g.centerY },
+  uApertureHalf: { value: g.apertureSize / 2 },
   uMode: { value: 0 },
   uCount: { value: 0 },
   uScreen: { value: screenRT.texture },
@@ -338,11 +342,18 @@ const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
 quad.frustumCulled = false;
 quadScene.add(quad);
 
-function runPass(material, target) {
+// Renders a full-screen pass into target, or only rows [row, row + rows)
+// of it when given.
+function runPass(material, target, row, rows) {
   quad.material = material;
+  if (rows) {
+    target.scissor.set(0, row, target.width, rows);
+    target.scissorTest = true;
+  }
   renderer.setRenderTarget(target);
   renderer.render(quadScene, quadCamera);
   renderer.setRenderTarget(null);
+  target.scissorTest = false;
 }
 
 // ---- The 3D scene ---------------------------------------------------------
@@ -372,12 +383,11 @@ function canvasTexture(size) {
   return new THREE.CanvasTexture(c);
 }
 
-// A square plane across the axis at grid column x. Turned to face along
-// the axis, its local x runs out of the slice, so scaling that squeezes
-// it to a line.
-function makePlane(x, texture) {
-  const size = g.H * UNIT;
-  const geo = new THREE.PlaneGeometry(size, size);
+// A square plane `size` grid cells across, standing across the axis at
+// grid column x. Turned to face along the axis, its local x runs out of
+// the slice, so scaling that squeezes it to a line.
+function makePlane(x, texture, size) {
+  const geo = new THREE.PlaneGeometry(size * UNIT, size * UNIT);
   const mesh = new THREE.Mesh(
     geo,
     new THREE.MeshBasicMaterial({
@@ -399,49 +409,50 @@ function makePlane(x, texture) {
   return { mesh, edges };
 }
 
-const sourceTex = canvasTexture(g.H);
+// The source and aperture planes are as big as the aperture; the screen
+// is the full height of the slice.
+const A = g.apertureSize;
+const sourceTex = canvasTexture(A);
 
 // Draws the source plane: faintly tinted, with a glow at the point source,
 // or evenly lit for a plane wave, which comes from no single point.
 function drawSource() {
   const ctx = sourceTex.image.getContext("2d");
-  const mid = g.H / 2;
+  const mid = A / 2;
   // Canvas rows run top down, so raising the source moves it up the canvas.
   const y = mid - g.srcH;
-  ctx.clearRect(0, 0, g.H, g.H);
+  ctx.clearRect(0, 0, A, A);
   ctx.fillStyle = g.plane ? "rgba(255, 255, 255, 0.18)" : "rgba(150, 170, 220, 0.06)";
-  ctx.fillRect(0, 0, g.H, g.H);
-  if (g.plane) {
-    sourceTex.needsUpdate = true;
-    return;
+  ctx.fillRect(0, 0, A, A);
+  if (!g.plane) {
+    const glow = ctx.createRadialGradient(mid, y, 0, mid, y, A * 0.12);
+    glow.addColorStop(0, "rgba(255, 255, 255, 1)");
+    glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, A, A);
   }
-  const glow = ctx.createRadialGradient(mid, y, 0, mid, y, g.H * 0.08);
-  glow.addColorStop(0, "rgba(255, 255, 255, 1)");
-  glow.addColorStop(1, "rgba(255, 255, 255, 0)");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, g.H, g.H);
   sourceTex.needsUpdate = true;
 }
 
-const apertureTex = canvasTexture(g.H);
+const apertureTex = canvasTexture(A);
 
 // Draws the aperture plane face on: wall, and either full-width slits or
 // round lenses shaded by their grooves (averaged where two overlap).
 function drawAperture(ap) {
   const ctx = apertureTex.image.getContext("2d");
-  const img = ctx.createImageData(g.H, g.H);
-  for (let cy = 0; cy < g.H; cy++) {
+  const img = ctx.createImageData(A, A);
+  for (let cy = 0; cy < A; cy++) {
     // Canvas rows run top down; slice rows bottom up.
-    const row = g.H - 1 - cy;
-    for (let cx = 0; cx < g.H; cx++) {
+    const row = g.centerY + A / 2 - 1 - cy;
+    for (let cx = 0; cx < A; cx++) {
       let color = WALL;
       let alpha = 110;
-      if (ap.mode === MODE_LENS) {
+      if (ap.lens) {
         let shade = 0;
         let covering = 0;
-        for (const center of ap.lensCenters) {
-          const rho = Math.hypot(cx - g.centerY, row - g.centerY - center);
-          if (rho > g.lensRadius) continue;
+        for (const center of ap.lens.centers) {
+          const rho = Math.hypot(cx - A / 2, row - g.centerY - center);
+          if (rho > ap.lens.radius) continue;
           shade += 0.45 + 0.55 * lensGroove(g, rho);
           covering += 1;
         }
@@ -452,7 +463,7 @@ function drawAperture(ap) {
       } else if (ap.kind[row] !== ROW_WALL) {
         alpha = 0;
       }
-      img.data.set([...color, alpha], (cy * g.H + cx) * 4);
+      img.data.set([...color, alpha], (cy * A + cx) * 4);
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -460,9 +471,9 @@ function drawAperture(ap) {
 }
 
 const planes = [
-  makePlane(g.srcX + 0.5, sourceTex),
-  makePlane(g.barrierX + 0.5, apertureTex),
-  makePlane(g.screenX, screenColorRT.texture),
+  makePlane(g.srcX + 0.5, sourceTex, A),
+  makePlane(g.barrierX + 0.5, apertureTex, A),
+  makePlane(g.screenX, screenColorRT.texture, g.H),
 ];
 
 // Places the camera and planes part way between the flat view (t = 0)
@@ -474,13 +485,23 @@ function layout(t) {
   const halfW = (TOTAL_W * UNIT) / 2;
   const halfH = (g.H * UNIT) / 2;
   const flatDist = Math.max(halfH, halfW / aspect) / Math.tan(half);
+  // In the flat view the slice is pinned to the top-left corner, so any
+  // spare room collects at the bottom (where the controls float) or on
+  // the right. Shifting the camera the other way moves the slice there.
+  const viewHalfH = flatDist * Math.tan(half);
+  const pin = new THREE.Vector3(
+    Math.max(0, viewHalfH * aspect - halfW),
+    -Math.max(0, viewHalfH - halfH),
+    0,
+  ).multiplyScalar(1 - e);
   // Fit the whole scene, planes included, inside the view.
   const fit = Math.min(half, Math.atan(aspect * Math.tan(half)));
   const obliqueDist = (0.8 * Math.hypot(halfW, halfH, halfH)) / Math.sin(fit);
 
   const dir = new THREE.Vector3(0, 0, 1).lerp(OBLIQUE_DIR, e).normalize();
   camera.position.copy(dir.multiplyScalar(THREE.MathUtils.lerp(flatDist, obliqueDist, e)));
-  camera.lookAt(0, 0, 0);
+  camera.position.add(pin);
+  camera.lookAt(pin);
 
   for (const { mesh, edges } of planes) {
     mesh.scale.x = Math.max(e, 1e-4);
@@ -503,8 +524,15 @@ function resize() {
 const readBack = new Float32Array(g.H * g.H * 4);
 let dirty = true;
 
-function compute() {
-  const t0 = performance.now();
+// Wavelet sums to do per drawn frame. The light is computed a band of
+// rows at a time, so a heavy case (the lenses) never freezes the page or
+// trips the GPU's watchdog; the previous picture stays up meanwhile.
+const SUMS_PER_FRAME = 2e8;
+// The calculation in progress, or null when the light is up to date.
+let job = null;
+
+// Starts recomputing the light for the current settings.
+function startCompute() {
   g = geometry(params);
   const ap = aperture(params, g);
   for (let y = 0; y < g.H; y++) rowsData.set([ap.kind[y], ap.groove[y], 0, 0], y * 4);
@@ -520,18 +548,40 @@ function compute() {
   U.uMode.value = ap.mode;
   U.uCount.value = ap.count;
   U.uHue.value.set(...wavelengthColor(params.wavelength).map((c) => c / 255));
+  drawAperture(ap);
+  drawSource();
 
-  runPass(fieldPass, fieldRT);
-  runPass(screenPass, screenRT);
-  // Reading back waits for the GPU, which also makes the timing honest.
+  // Rough sums per pixel: one per slit row, or for the lenses one per
+  // point averaged around each ring (see the shader).
+  const perPixel = ap.lens ? ap.count * (8 + 0.4 * g.k * ap.lens.radius) : ap.count;
+  job = { fieldRow: 0, screenRow: 0, perPixel, started: performance.now() };
+}
+
+// Does one frame's share of the calculation, finishing it if it can.
+function continueCompute() {
+  let budget = SUMS_PER_FRAME;
+  const band = (material, target, done) => {
+    const width = target.width;
+    const rows = Math.min(
+      target.height - done,
+      Math.max(1, Math.floor(budget / (width * job.perPixel))),
+    );
+    runPass(material, target, done, rows);
+    budget -= rows * width * job.perPixel;
+    return done + rows;
+  };
+  while (budget > 0 && job.fieldRow < g.H) job.fieldRow = band(fieldPass, fieldRT, job.fieldRow);
+  while (budget > 0 && job.screenRow < g.H) job.screenRow = band(screenPass, screenRT, job.screenRow);
+  if (job.screenRow < g.H) return;
+
+  // Read the screen back once to normalize it to its brightest point.
   renderer.readRenderTargetPixels(screenRT, 0, 0, g.H, g.H, readBack);
   let maxI = 1e-9;
   for (let i = 2; i < readBack.length; i += 4) maxI = Math.max(maxI, readBack[i]);
   U.uMaxI.value = maxI;
   runPass(screenColorPass, screenColorRT);
-  drawAperture(ap);
-  drawSource();
-  controls.computed(performance.now() - t0);
+  controls.computed(performance.now() - job.started);
+  job = null;
 }
 
 let viewT = 0;
@@ -543,8 +593,9 @@ function frame(now) {
   last = now;
   if (dirty) {
     dirty = false;
-    compute();
+    startCompute();
   }
+  if (job) continueCompute();
 
   const target = params.view === "planes" ? 1 : 0;
   const step = dt / TRANSITION;

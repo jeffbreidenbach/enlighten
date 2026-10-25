@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   --bg: #06080e;
-  --panel: #11151f;
+  --panel: rgba(17, 21, 31, 0.88);
   --text: #d8dce6;
   --muted: #8a92a6;
   --accent: #ffb040;
@@ -11,18 +11,22 @@
   box-sizing: border-box;
 }
 
-/* The page fills the window exactly; the canvas takes whatever space the
-   controls leave, so nothing ever scrolls. */
+/* Keep hidden controls hidden even where a rule sets their display. */
+[hidden] {
+  display: none !important;
+}
+
+/* The page fills the window exactly and never scrolls. The canvas covers
+   all of it, and the controls float over it as a toolbar along the
+   bottom, where the wide slice leaves a band. */
 body {
-  display: flex;
-  flex-direction: column;
   height: 100vh;
   height: 100dvh;
   margin: 0;
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.4 system-ui, sans-serif;
+  font: 14px/1.3 system-ui, sans-serif;
 }
 
 a {
@@ -30,24 +34,15 @@ a {
 }
 
 main {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px 16px 16px 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
-@media (max-width: 800px) {
-  main {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-}
-
-/* The three.js canvas resizes its drawing to fill this space. */
+/* The three.js canvas resizes its drawing to fill the window. */
 canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -55,31 +50,42 @@ canvas {
 }
 
 aside {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: fit-content;
+  margin-inline: auto;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 18px;
+  padding: 8px 14px;
   border-radius: 6px;
   background: var(--panel);
-  align-self: start;
-  max-height: 100%;
-  overflow: auto;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 8px;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 2px 8px;
 }
 
 .row span {
   grid-column: 1 / -1;
   color: var(--muted);
+  font-size: 12px;
+}
+
+.row input[type="range"] {
+  width: 130px;
 }
 
 .row output {
-  min-width: 2.5em;
+  min-width: 3.5em;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .buttons {
@@ -94,12 +100,14 @@ select {
   background: #1c2230;
   border: 1px solid #2c3446;
   border-radius: 4px;
-  padding: 4px 10px;
+  padding: 3px 8px;
 }
 
 .stats {
   margin: 0;
+  min-width: 11em;
   color: var(--muted);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 

@@ -1,28 +1,34 @@
 // Scene layout and optics for the simulator.
 //
-// The setup is three-dimensional: an aperture plane and a screen plane
-// centered on one axis, and a point source that sits on the axis or is
-// raised above it. Light is a steady wave of one
-// color, so every point holds a complex amplitude (strength and phase)
-// worked out once by adding up Huygens wavelets from the open parts of
-// the aperture plane. Animating only advances the phase, so the pattern
-// is settled from the first frame and nothing ever reflects.
+// The setup is three-dimensional: a small aperture plane and a large
+// screen plane centered on one axis, and a light source that sits on the
+// axis or is raised above it. The source lights only the aperture plane,
+// like a flashlight or a laser beam. Light is a steady wave of one color,
+// so every point holds a complex amplitude (strength and phase) worked
+// out once by adding up Huygens wavelets from the open parts of the
+// aperture plane. Animating only advances the phase, so the pattern is
+// settled from the first frame and nothing ever reflects.
 //
 // The flat view is the slice through the axis that contains the vertical
 // center line of each plane. Positions are in grid cells: x runs along
 // the axis, y is the height above it.
 
-const BASE_W = 480;
+// The slice is 640 x 300 base cells, plus a 20-cell strip for the screen:
+// a 2.2:1 shape that suits laptop windows, leaving bands above and below
+// for the controls.
+const BASE_W = 640;
 const BASE_H = 300;
-// Grid cells per base cell. Sizes below are set for the 480x300 base
-// grid; raising this scales everything up so the scene looks the same,
-// just with finer cells.
-const SCALE = 1;
+// Grid cells per base cell. Sizes below are in base cells; the grid is
+// finer so that waves, only 4 base cells long, still draw smoothly.
+const SCALE = 2;
 
-// Grid cells per nanometre of wavelength, so 550 nm is 16 cells.
-const CELLS_PER_NM = 16 / 550;
-// How far crests move per drawn frame, in cells of the base grid.
-const SPEED = 0.375;
+// Base cells per nanometre of wavelength, so 550 nm is 4 base cells and
+// the screen is 75 wavelengths tall. Zooming out this far gives the light
+// room to reach the far field.
+const CELLS_PER_NM = 4 / 550;
+export const DEFAULT_WAVELENGTH = 550;
+// How far crests move per drawn frame, in base cells.
+const SPEED = 0.094;
 // How strongly the light's strength maps to brightness.
 export const GAIN = 2.5;
 
@@ -38,33 +44,45 @@ export const APERTURES = {
   lens2: "Two Fresnel lenses",
 };
 
+// The aperture plane is this tall (and wide), in base cells: about a
+// quarter of the screen, so the beams it sends out can separate on it.
+const APERTURE_SIZE = 80;
+
+// 5.66 base cells: the default wavelength times the square root of 2.
+const GRATING_PERIOD = DEFAULT_WAVELENGTH * CELLS_PER_NM * Math.SQRT2;
+
 // Slits run the full width of the aperture plane, so in the slice each
 // one is an opening at a fixed height: [center offset, half width], in
-// base cells.
+// base cells. At 550 nm a wavelength is 4 base cells.
 const OPENINGS = {
-  single: [[0, 20]],
+  // 5 wavelengths wide.
+  single: [[0, 10]],
+  // 1 wavelength wide, 10 wavelengths apart.
   double: [
-    [-30, 4],
-    [30, 4],
+    [-20, 2],
+    [20, 2],
   ],
-  // 50% open: a 30-cell period, 15 open and 15 blocked, across the whole
-  // 300-cell height of the plane. The period is fine enough that only the
-  // zero and first orders leave the grating.
-  grating: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5].map((n) => [n * 30, 7.5]),
+  // 50% open across the whole plane, with the period chosen so that a
+  // plane wave arriving at 45 degrees, at the default wavelength, sends
+  // its first order straight out along the normal (the grating equation:
+  // period = wavelength / sin 45). Only two beams leave: the zero order,
+  // still at 45 degrees, and the first order, straight ahead.
+  grating: Array.from({ length: 15 }, (_, i) => [(i - 7) * GRATING_PERIOD, GRATING_PERIOD / 4]),
 };
-// Round lenses with this radius, centered at these heights in base cells.
-// Two lenses are superimposed: where they overlap, the aperture passes
-// half of each.
-const LENS_RADIUS = 105;
-const LENS_CENTERS = {
-  lens: [0],
-  lens2: [-30, 30],
+// Round lenses: their centers' heights and radius, in base cells. Two
+// lenses are superimposed: where they overlap, the aperture passes half
+// of each.
+const LENSES = {
+  lens: { centers: [0], radius: 38 },
+  lens2: { centers: [-10, 10], radius: 28 },
 };
 
-// Row kinds along the aperture line of the slice.
-export const ROW_WALL = 0;
-export const ROW_OPEN = 1;
-export const ROW_LENS = 2;
+// Row kinds along the aperture line of the slice. Rows outside the
+// aperture plane are none of these: no light reaches them.
+export const ROW_NONE = 0;
+export const ROW_WALL = 1;
+export const ROW_OPEN = 2;
+export const ROW_LENS = 3;
 
 // How the wavelets are summed: rows of full-width slits, or rings of a
 // round lens.
@@ -79,14 +97,14 @@ export function geometry(params) {
   // The screen plane sits in the strip to the right of the slice.
   const screenX = W + stripW / 2 + r;
   // The point source sits at the left edge, just far enough in for its
-  // dot to show; the aperture is a fifth of the way across.
+  // dot to show; the aperture is 96 base cells in.
   const srcX = 3 * r;
-  const barrierX = Math.round(W * 0.2);
+  const barrierX = 96 * r;
   const srcH = params.sourceHeight * r;
-  // A plane wave travels as if from a far-off source in the direction of
-  // the source point, so raising the source tilts it. This is its
-  // direction of travel within the slice.
-  const toPlane = Math.hypot(barrierX - srcX, srcH);
+  // The plane wave's direction of travel within the slice: tilted down by
+  // the beam angle, so a positive angle comes from above, as a raised
+  // point source would.
+  const angle = (params.beamAngle * Math.PI) / 180;
   return {
     r,
     W,
@@ -96,15 +114,15 @@ export function geometry(params) {
     // Height of the source above the axis, within the slice.
     srcH,
     plane: params.light === "plane",
-    dirX: (barrierX - srcX) / toPlane,
-    dirY: -srcH / toPlane,
+    dirX: Math.cos(angle),
+    dirY: -Math.sin(angle),
     barrierX,
     barrierHalf: r,
     centerY: H / 2,
+    apertureSize: APERTURE_SIZE * r,
     screenX,
     // The lens brings an on-axis source to a point on the screen plane.
     focusX: screenX,
-    lensRadius: LENS_RADIUS * r,
     k: (2 * Math.PI) / (params.wavelength * CELLS_PER_NM * r),
   };
 }
@@ -128,7 +146,8 @@ export function lensGroove(g, rho) {
 // Describes the aperture.
 //
 // `kind` and `groove` give, for each row of the slice, whether the
-// aperture line is wall, open or lens there, for drawing.
+// aperture line is outside the plane, wall, open or lens there, for
+// drawing.
 //
 // `sources` lists the wavelets to sum, four floats each:
 // - slits: [height, re, im, distance from the source] per open row. The
@@ -142,9 +161,14 @@ export function lensGroove(g, rho) {
 // the light arriving from the source. Light is scaled so the incoming
 // wave has strength 1 where it meets the aperture on the axis; a plane
 // wave has strength 1 everywhere.
+//
+// `lens` is the lens layout in grid cells, or null, and `maxRadius` the
+// largest ring, used to estimate how much work the sums are.
 export function aperture(params, g) {
-  const lensCenters = (LENS_CENTERS[params.aperture] ?? []).map((c) => c * g.r);
-  const lens = lensCenters.length > 0;
+  const layout = LENSES[params.aperture];
+  const lens = layout
+    ? { centers: layout.centers.map((c) => c * g.r), radius: layout.radius * g.r }
+    : null;
   const kind = new Uint8Array(g.H);
   const groove = new Float32Array(g.H);
   const s0 = g.barrierX - g.srcX;
@@ -152,8 +176,10 @@ export function aperture(params, g) {
 
   for (let y = 0; y < g.H; y++) {
     const dy = y - g.centerY;
+    if (Math.abs(dy) > g.apertureSize / 2) continue;
+    kind[y] = ROW_WALL;
     if (lens) {
-      const c = lensCenters.find((c) => Math.abs(dy - c) <= g.lensRadius);
+      const c = lens.centers.find((c) => Math.abs(dy - c) <= lens.radius);
       if (c === undefined) continue;
       kind[y] = ROW_LENS;
       groove[y] = lensGroove(g, Math.abs(dy - c));
@@ -176,12 +202,12 @@ export function aperture(params, g) {
     }
   }
 
-  for (const center of lensCenters) {
-    for (let i = 0; i + 0.5 <= g.lensRadius; i++) {
+  for (const center of lens?.centers ?? []) {
+    for (let i = 0; i + 0.5 <= lens.radius; i++) {
       const rho = i + 0.5;
       // Huygens-Fresnel factor for a ring: strength k * rho per unit of
       // radius and a 90 degree lag, then the lens's delay.
-      const a = (g.k * rho) / lensCenters.length;
+      const a = (g.k * rho) / lens.centers.length;
       list.push([rho, a, -Math.PI / 2 - lensDelay(g, rho), center]);
     }
   }
@@ -194,7 +220,7 @@ export function aperture(params, g) {
     mode: lens ? MODE_LENS : MODE_SLITS,
     kind,
     groove,
-    lensCenters,
+    lens,
     sources,
     count: list.length,
   };
