@@ -47,9 +47,10 @@ const OPENINGS = {
     [-30, 4],
     [30, 4],
   ],
-  // 50% open: a 30-cell period, 15 open and 15 blocked. The period is
-  // fine enough that only the zero and first orders leave the grating.
-  grating: [-3, -2, -1, 0, 1, 2, 3].map((n) => [n * 30, 7.5]),
+  // 50% open: a 30-cell period, 15 open and 15 blocked, across the whole
+  // 300-cell height of the plane. The period is fine enough that only the
+  // zero and first orders leave the grating.
+  grating: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5].map((n) => [n * 30, 7.5]),
 };
 // Round lenses with this radius, centered at these heights in base cells.
 // Two lenses are superimposed: where they overlap, the aperture passes
@@ -77,8 +78,10 @@ export function geometry(params) {
   const stripW = 20 * r;
   // The screen plane sits in the strip to the right of the slice.
   const screenX = W + stripW / 2 + r;
-  const srcX = Math.round(W * 0.12);
-  const barrierX = Math.round(W * 0.4);
+  // The point source sits at the left edge, just far enough in for its
+  // dot to show; the aperture is a fifth of the way across.
+  const srcX = 3 * r;
+  const barrierX = Math.round(W * 0.2);
   const srcH = params.sourceHeight * r;
   // A plane wave travels as if from a far-off source in the direction of
   // the source point, so raising the source tilts it. This is its
