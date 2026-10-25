@@ -12,7 +12,6 @@ import * as THREE from "three";
 import { createControls } from "./controls.js";
 import {
   BG,
-  GAIN,
   GLASS,
   MODE_LENS,
   ROW_LENS,
@@ -86,8 +85,15 @@ uniform int uMode, uCount;
 // axis, y up), 0 for the point source.
 uniform int uPlane;
 uniform vec2 uDir;
+uniform float uApertureHalf;
 
 const float TAU = 6.28318531;
+
+// How strongly the beam lights a point q of the aperture plane, measured
+// from its center. Same rule as beamProfile() in optics.js.
+float beamProfile(vec2 q) {
+  return exp(-3.0 * dot(q, q) / (uApertureHalf * uApertureHalf));
+}
 
 vec2 wave(float d) {
   float kr = mod(uK * d, TAU);
@@ -147,7 +153,8 @@ vec2 fieldAt(float x, vec2 p) {
         float phi = (float(j) + 0.5) * TAU / float(n);
         vec2 q = rho * vec2(cos(phi), sin(phi));
         float r = sqrt(toP2 - 2.0 * dot(pc, q));
-        vec2 arriving = incident(uBarrierX, vec2(q.x, s.w + q.y));
+        vec2 plane = vec2(q.x, s.w + q.y);
+        vec2 arriving = beamProfile(plane) * incident(uBarrierX, plane);
         sum += cmul(arriving, wavelet(r, dx));
       }
       u += cmul(s.yz, sum / float(n));
@@ -191,7 +198,7 @@ uniform float uMaxI;
 out vec4 outColor;
 void main() {
   float i = texelFetch(uScreen, ivec2(gl_FragCoord.xy), 0).b;
-  outColor = vec4(uHue * pow(clamp(i / uMaxI, 0.0, 1.0), 0.8), 1.0);
+  outColor = vec4(uHue * clamp(i / uMaxI, 0.0, 1.0), 1.0);
 }`;
 
 // The slice is added on top of the scene, so black here means clear.
@@ -231,7 +238,8 @@ float beam(vec2 c) {
     scale = along / toPlane;
   }
   float inside = min(hit - (uCenterY - uApertureHalf), uCenterY + uApertureHalf - hit) * scale;
-  return smoothstep(-1.5, 1.5, inside);
+  float t = (hit - uCenterY) / uApertureHalf;
+  return smoothstep(-1.5, 1.5, inside) * exp(-3.0 * t * t);
 }
 
 void main() {
@@ -239,25 +247,30 @@ void main() {
   vec3 rgb = vec3(0.0);
   if (c.x < uW) {
     vec4 row = texelFetch(uRows, ivec2(int(c.y), 0), 0);
-    bool drawn = row.x == ${f1(ROW_WALL)} || row.x == ${f1(ROW_LENS)};
+    // Wall, lens glass, or an open row that partly blocks (the sine
+    // grating), drawn as wall in proportion.
+    bool partial = row.x == ${f1(ROW_OPEN)} && row.y > 0.01;
+    bool drawn = row.x == ${f1(ROW_WALL)} || row.x == ${f1(ROW_LENS)} || partial;
     if (abs(c.x - uBarrierX) <= uBarrierHalf && drawn) {
-      rgb = row.x == ${f1(ROW_WALL)} ? ${vec3(WALL)} : ${vec3(GLASS)} * (0.45 + 0.55 * row.y);
+      rgb = row.x == ${f1(ROW_WALL)} ? ${vec3(WALL)}
+          : partial ? ${vec3(WALL)} * row.y
+          : ${vec3(GLASS)} * (0.45 + 0.55 * row.y);
     } else if (uPlane == 0 && distance(c, vec2(uSrcX, uCenterY + uSrcH)) <= 3.0 * uR) {
       rgb = vec3(1.0);
     } else {
       // Each wave is a smooth cosine: brightest at the crest, dark in the
-      // trough. How strong the light is sets the overall brightness,
-      // compressed so weak light still shows.
+      // trough. How strong the light is sets the overall brightness, in
+      // proportion, so weak light looks genuinely weak.
       vec2 f = texelFetch(uField, ivec2(c), 0).xy;
       float amp = length(f);
       float shade = 0.5 + 0.5 * dot(f, uPhase) / max(amp, 1e-6);
-      float strength = tanh(min(${GAIN.toFixed(1)} * amp, 10.0));
+      float strength = min(amp, 1.0);
       rgb = uHue * shade * strength * beam(c);
     }
   } else if (c.x >= uW + 2.0 * uR) {
     // The screen strip: the center line of the screen plane.
     float i = texelFetch(uScreen, ivec2(int(uCenterY), int(c.y)), 0).b;
-    rgb = uHue * pow(clamp(i / uMaxI, 0.0, 1.0), 0.8) * uStrip;
+    rgb = uHue * clamp(i / uMaxI, 0.0, 1.0) * uStrip;
   }
   outColor = vec4(rgb, 1.0);
 }`;
@@ -465,8 +478,8 @@ function drawAperture(ap) {
           color = GLASS.map((c) => (c * shade) / covering);
           alpha = 120;
         }
-      } else if (ap.kind[row] !== ROW_WALL) {
-        alpha = 0;
+      } else if (ap.kind[row] === ROW_OPEN) {
+        alpha *= ap.groove[row];
       }
       img.data.set([...color, alpha], (cy * A + cx) * 4);
     }

@@ -49,20 +49,35 @@ canvas {
   background: var(--bg);
 }
 
+/* The toolbar spans the bottom: controls on the left, the explanation of
+   the last change on the right. On narrow windows the text wraps below. */
 aside {
   position: absolute;
   left: 10px;
   right: 10px;
   bottom: 10px;
-  width: fit-content;
-  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.controls {
+  flex: 0 1 720px;
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 8px 18px;
-  padding: 8px 14px;
-  border-radius: 6px;
-  background: var(--panel);
+}
+
+.explain {
+  flex: 1 1 320px;
+  max-width: 640px;
+  margin: 0;
+  line-height: 1.4;
 }
 
 .row {
@@ -84,7 +99,7 @@ aside {
 
 .row output {
   min-width: 3.5em;
-  text-align: right;
+  text-align: left;
   font-variant-numeric: tabular-nums;
 }
 

@@ -29,9 +29,6 @@ const CELLS_PER_NM = 4 / 550;
 export const DEFAULT_WAVELENGTH = 550;
 // How far crests move per drawn frame, in base cells.
 const SPEED = 0.094;
-// How strongly the light's strength maps to brightness.
-export const GAIN = 2.5;
-
 export const BG = [6, 8, 14];
 export const WALL = [120, 124, 136];
 export const GLASS = [150, 190, 220];
@@ -39,7 +36,7 @@ export const GLASS = [150, 190, 220];
 export const APERTURES = {
   single: "Single slit",
   double: "Double slit",
-  grating: "Grating",
+  grating: "Sine grating",
   lens: "Fresnel lens",
   lens2: "Two Fresnel lenses",
 };
@@ -48,7 +45,13 @@ export const APERTURES = {
 // quarter of the screen, so the beams it sends out can separate on it.
 const APERTURE_SIZE = 80;
 
-// 5.66 base cells: the default wavelength times the square root of 2.
+// The sine grating's transparency follows a cosine across the plane: what
+// two interfering plane waves record on film. Its period is the default
+// wavelength times the square root of 2 (5.66 base cells), so a plane wave
+// arriving at 45 degrees, at the default wavelength, sends its first order
+// straight out along the normal (the grating equation: period =
+// wavelength / sin 45). Only two beams leave: the zero order, still at 45
+// degrees, and the first order, straight ahead.
 const GRATING_PERIOD = DEFAULT_WAVELENGTH * CELLS_PER_NM * Math.SQRT2;
 
 // Slits run the full width of the aperture plane, so in the slice each
@@ -62,13 +65,8 @@ const OPENINGS = {
     [-20, 2],
     [20, 2],
   ],
-  // 50% open across the whole plane, with the period chosen so that a
-  // plane wave arriving at 45 degrees, at the default wavelength, sends
-  // its first order straight out along the normal (the grating equation:
-  // period = wavelength / sin 45). Only two beams leave: the zero order,
-  // still at 45 degrees, and the first order, straight ahead.
-  grating: Array.from({ length: 15 }, (_, i) => [(i - 7) * GRATING_PERIOD, GRATING_PERIOD / 4]),
 };
+
 // Round lenses: their centers' heights and radius, in base cells. Two
 // lenses are superimposed: where they overlap, the aperture passes half
 // of each.
@@ -120,6 +118,8 @@ export function geometry(params) {
     barrierHalf: r,
     centerY: H / 2,
     apertureSize: APERTURE_SIZE * r,
+    // The grating's period, in grid cells.
+    gratingPeriod: GRATING_PERIOD * r,
     screenX,
     // The lens brings an on-axis source to a point on the screen plane.
     focusX: screenX,
@@ -128,12 +128,24 @@ export function geometry(params) {
 }
 
 // The phase delay a perfect lens adds at distance rho from its center to
-// focus a source on its own axis onto the focus plane. The lens is fixed, so
-// raising the source moves the focus instead of changing the lens.
+// focus light arriving along its own axis onto the focus plane: from the
+// point source, or a plane wave (a source infinitely far away). Raising
+// the source or tilting the wave moves the focus instead of changing the
+// lens.
 function lensDelay(g, rho) {
   const toSource = g.barrierX - g.srcX;
   const toFocus = g.focusX - g.barrierX;
-  return g.k * (Math.hypot(rho, toSource) - toSource + Math.hypot(rho, toFocus) - toFocus);
+  const fromSource = g.plane ? 0 : Math.hypot(rho, toSource) - toSource;
+  return g.k * (fromSource + Math.hypot(rho, toFocus) - toFocus);
+}
+
+// How strongly the beam lights a point d grid cells from the aperture's
+// center. The beam has soft edges, like a laser's Gaussian profile,
+// falling to 5% at the aperture's edge, so the edges don't throw off
+// ripples of their own. The shader has the same rule.
+export function beamProfile(g, d) {
+  const t = d / (g.apertureSize / 2);
+  return Math.exp(-3 * t * t);
 }
 
 // A Fresnel lens wraps that delay every full wavelength, which is what
@@ -147,7 +159,8 @@ export function lensGroove(g, rho) {
 //
 // `kind` and `groove` give, for each row of the slice, whether the
 // aperture line is outside the plane, wall, open or lens there, for
-// drawing.
+// drawing. For open rows, `groove` instead holds how much the row blocks
+// (0 for a clear slit; between 0 and 1 for the sine grating).
 //
 // `sources` lists the wavelets to sum, four floats each:
 // - slits: [height, re, im, distance from the source] per open row. The
@@ -185,15 +198,23 @@ export function aperture(params, g) {
       groove[y] = lensGroove(g, Math.abs(dy - c));
       continue;
     }
-    const open = OPENINGS[params.aperture].some(
-      ([center, half]) => Math.abs(dy - center * g.r) <= half * g.r,
-    );
-    if (!open) continue;
+    // How much of the arriving light the row lets through.
+    let pass;
+    if (params.aperture === "grating") {
+      pass = 0.5 + 0.5 * Math.cos((2 * Math.PI * dy) / g.gratingPeriod);
+    } else {
+      const open = OPENINGS[params.aperture].some(
+        ([center, half]) => Math.abs(dy - center * g.r) <= half * g.r,
+      );
+      pass = open ? 1 : 0;
+    }
+    if (pass === 0) continue;
     kind[y] = ROW_OPEN;
+    groove[y] = 1 - pass;
     // Strength sqrt(k / 2pi) and a 45 degree lag from summing along the
     // slit. For a point source, 1/sqrt(R) is what remains of its
     // fall-off; a plane wave just arrives with its tilt's phase.
-    const amp = Math.sqrt(g.k / (2 * Math.PI));
+    const amp = Math.sqrt(g.k / (2 * Math.PI)) * pass * beamProfile(g, dy);
     if (g.plane) {
       list.push([dy, amp, g.k * g.dirY * dy - Math.PI / 4, 0]);
     } else {
