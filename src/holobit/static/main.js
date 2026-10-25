@@ -189,6 +189,23 @@ uniform vec3 uHue;
 uniform float uMaxI, uW, uR, uSrcX, uSrcH, uCenterY, uBarrierX, uBarrierHalf;
 out vec4 outColor;
 
+// The source shines like a flashlight aimed at the aperture plane: before
+// the plane, light shows only inside the wedge from the source to the
+// plane's top and bottom edges. 1 inside, 0 outside, with a soft edge.
+// Only the drawing changes; the plane is fully lit either way.
+float beam(vec2 c) {
+  float toPlane = uBarrierX - uSrcX;
+  float along = c.x - uSrcX;
+  if (c.x >= uBarrierX - uBarrierHalf) return 1.0;
+  if (along <= 0.0) return 0.0;
+  // Where the ray from the source through c meets the plane, and how far
+  // inside the plane's edges that is, scaled back to c's distance.
+  float srcY = uCenterY + uSrcH;
+  float hit = srcY + (c.y - srcY) * toPlane / along;
+  float inside = min(hit, 2.0 * uCenterY - hit) * along / toPlane;
+  return smoothstep(-1.5, 1.5, inside);
+}
+
 void main() {
   vec2 c = floor(gl_FragCoord.xy);
   vec3 rgb = vec3(0.0);
@@ -202,7 +219,7 @@ void main() {
       // Crests light up in the wavelength's color; troughs stay dark.
       vec2 f = texelFetch(uField, ivec2(c), 0).xy;
       float v = tanh(clamp(${GAIN.toFixed(1)} * dot(f, uPhase), -10.0, 10.0));
-      rgb = uHue * max(v, 0.0);
+      rgb = uHue * max(v, 0.0) * beam(c);
     }
   } else if (c.x >= uW + 2.0 * uR) {
     // The screen strip: the center line of the screen plane.
