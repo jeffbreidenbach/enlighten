@@ -200,6 +200,9 @@ uniform sampler2D uField, uRows, uScreen;
 uniform vec2 uPhase;
 uniform vec3 uHue;
 uniform float uMaxI, uW, uR, uSrcX, uSrcH, uCenterY, uBarrierX, uBarrierHalf, uApertureHalf;
+// How much of the screen strip shows: 1 in the cross section, fading to
+// 0 in the full view, where the screen plane itself stands there.
+uniform float uStrip;
 uniform int uPlane;
 uniform vec2 uDir;
 out vec4 outColor;
@@ -254,7 +257,7 @@ void main() {
   } else if (c.x >= uW + 2.0 * uR) {
     // The screen strip: the center line of the screen plane.
     float i = texelFetch(uScreen, ivec2(int(uCenterY), int(c.y)), 0).b;
-    rgb = uHue * pow(clamp(i / uMaxI, 0.0, 1.0), 0.8);
+    rgb = uHue * pow(clamp(i / uMaxI, 0.0, 1.0), 0.8) * uStrip;
   }
   outColor = vec4(rgb, 1.0);
 }`;
@@ -328,12 +331,14 @@ const fieldPass = pass(FIELD, U);
 const screenPass = pass(SCREEN, { ...U, uScreenX: { value: g.screenX } });
 const screenColorPass = pass(SCREEN_COLOR, U);
 const uPhase = { value: new THREE.Vector2(1, 0) };
+const uStrip = { value: 1 };
 const sliceColorPass = pass(SLICE_COLOR, {
   ...U,
   uField: { value: fieldRT.texture },
   uPhase,
   uW: { value: g.W },
   uR: { value: g.r },
+  uStrip,
 });
 
 const quadScene = new THREE.Scene();
@@ -503,6 +508,7 @@ function layout(t) {
   camera.position.add(pin);
   camera.lookAt(pin);
 
+  uStrip.value = 1 - e;
   for (const { mesh, edges } of planes) {
     mesh.scale.x = Math.max(e, 1e-4);
     mesh.material.opacity = e;
@@ -603,10 +609,9 @@ function frame(now) {
 
   if (!controls.paused) phase += phaseStep(g);
   uPhase.value.set(Math.cos(phase), Math.sin(phase));
-  runPass(sliceColorPass, sliceColorRT);
-
   resize();
   layout(viewT);
+  runPass(sliceColorPass, sliceColorRT);
   renderer.render(scene, camera);
   controls.frame();
   requestAnimationFrame(frame);
