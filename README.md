@@ -1,6 +1,20 @@
 # holobit
 
-A minimal "Hello World" web server, managed with [uv](https://docs.astral.sh/uv/).
+An interactive, browser-based light simulator for teaching the ideas behind holography, from
+diffraction at a single slit toward holographic stereograms.
+
+It shows light as a steady wave of one color passing a source, an aperture plate and a screen:
+
+- **Apertures:** single slit, double slit, sine grating, an off-axis Fresnel lens, and two
+  overlaid Fresnel lenses.
+- **Light:** a point source you can raise or lower, or a plane wave you can tilt.
+- **Views:** a cross section through the middle of the setup showing the waves themselves, and a
+  full 3D view of the aperture plate and the screen.
+- **Tour:** the ◀ ▶ buttons step through a 12-stop guided tour, changing one thing at a time and
+  explaining what to notice. Every control also explains itself when changed.
+
+The light is computed by summing Huygens wavelets from the aperture plate in WebGL shaders
+(three.js), so it runs in any current browser on an ordinary laptop.
 
 ## Run
 
@@ -8,4 +22,15 @@ A minimal "Hello World" web server, managed with [uv](https://docs.astral.sh/uv/
 uv run holobit
 ```
 
-The server listens on all interfaces (`0.0.0.0`) on port 8000, so visit http://localhost:8000 or http://<this-machine-ip>:8000. Set `HOST` / `PORT` env vars to change the bind address.
+Then open http://localhost:8000. The server listens on all interfaces (`0.0.0.0`) on port 8000;
+set `HOST` (for example `HOST=127.0.0.1` to keep it private) and `PORT` to change that.
+
+## Layout
+
+- `src/holobit/__init__.py`: a small static file server.
+- `src/holobit/static/`: the simulator.
+  - `optics.js`: scene layout, apertures and physics constants.
+  - `main.js`: the shaders and the three.js scene.
+  - `controls.js`: the toolbar and the tour's controls.
+  - `explanations.js`, `tour.js`: the teaching texts.
+  - `vendor/`: three.js r170 (MIT).

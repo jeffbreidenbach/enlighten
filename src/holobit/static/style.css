@@ -29,10 +29,6 @@ body {
   font: 14px/1.3 system-ui, sans-serif;
 }
 
-a {
-  color: var(--accent);
-}
-
 main {
   position: relative;
   width: 100%;
@@ -65,19 +61,31 @@ aside {
   background: var(--panel);
 }
 
+/* The controls stay on one row; the explanation takes the rest of the
+   width. Only on narrow windows do the controls wrap. */
 .controls {
-  flex: 0 1 720px;
+  flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
   align-items: end;
   gap: 8px 18px;
 }
 
+@media (max-width: 1000px) {
+  .controls {
+    flex-wrap: wrap;
+  }
+}
+
+/* The explanation reads as prose, not as a control: a book serif, set
+   apart by space and a single faint hairline rather than a box. */
 .explain {
-  flex: 1 1 320px;
-  max-width: 640px;
-  margin: 0;
-  line-height: 1.4;
+  flex: 1 1 300px;
+  max-width: 1000px;
+  margin: 0 0 0 12px;
+  padding-left: 24px;
+  border-left: 1px solid rgba(138, 146, 166, 0.3);
+  color: #c4c9d4;
+  font: 15px/1.45 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
 }
 
 .row {
@@ -116,6 +124,36 @@ select {
   border: 1px solid #2c3446;
   border-radius: 4px;
   padding: 3px 8px;
+}
+
+/* The tour's back and next arrows, at the far right of the toolbar. */
+.tour {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tour button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 15px;
+}
+
+.tour button:last-child:not(:disabled) {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.tour button:disabled {
+  opacity: 0.35;
 }
 
 .error {

@@ -1,4 +1,5 @@
-// What the explanation box says after each control changes. The texts
+// What the explanation box says after each control changes: a string, or
+// a function of the settings when the text depends on them. The texts
 // build up, step by step, the ideas a student needs for holographic
 // stereograms: diffraction, interference, gratings, a lens as the hologram
 // of a point, superposition, reference beams and viewpoints.
@@ -18,10 +19,16 @@ export const EXPLANATIONS = {
     "exactly what two interfering plane waves record on film, so this is the simplest possible " +
     "hologram. Lit by a plane wave, it splits the light into just a few beams, called orders: " +
     "tilt the beam to 45 degrees and its first order comes straight out.",
-  lens:
+  // Where the off-center lens sends the light depends on the light.
+  lens: (params) =>
     "A Fresnel lens is a flattened lens: rings that delay the light just enough to bend every part " +
-    "of the wave toward one point on the screen. It is also the hologram of a single point. Shine " +
-    "light through it and it recreates that point.",
+    "of the wave toward one point. This one is off center. " +
+    (params.light === "point"
+      ? "Lit by the point source, it both steers and focuses, sending the light up to a spot high " +
+        "on the screen. "
+      : "A straight-on plane wave focuses along the lens's own axis, to a spot just above the " +
+        "screen's center. ") +
+    "A lens like this is the hologram of a single point.",
   lens2:
     "Two lenses overlaid on one plate focus light to two separate points at once. A hologram works " +
     "the same way: it is the sum of the 'lenses' for every point of an object, all on one plate. A " +

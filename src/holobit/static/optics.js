@@ -69,22 +69,25 @@ const OPENINGS = {
 
 // Round lenses: their centers' heights and radius, in base cells. Two
 // lenses are superimposed: where they overlap, the aperture passes half
-// of each.
+// of each. The single lens sits 15 cells above the axis, so it images the
+// on-axis source to a spot about 105 cells above the screen's center:
+// its light visibly bends, and can't be mistaken for light passing
+// straight through. An off-center piece of a zone plate like this is a
+// grating plus a lens, which is what an off-axis hologram of a point is.
 const LENSES = {
-  lens: { centers: [0], radius: 38 },
+  lens: { centers: [15], radius: 25 },
   lens2: { centers: [-10, 10], radius: 28 },
 };
 
 // Row kinds along the aperture line of the slice. Rows outside the
-// aperture plane are none of these: no light reaches them.
-export const ROW_NONE = 0;
+// aperture plane are 0: no light reaches them.
 export const ROW_WALL = 1;
 export const ROW_OPEN = 2;
 export const ROW_LENS = 3;
 
 // How the wavelets are summed: rows of full-width slits, or rings of a
 // round lens.
-export const MODE_SLITS = 0;
+const MODE_SLITS = 0;
 export const MODE_LENS = 1;
 
 export function geometry(params) {
@@ -175,8 +178,8 @@ export function lensGroove(g, rho) {
 // wave has strength 1 where it meets the aperture on the axis; a plane
 // wave has strength 1 everywhere.
 //
-// `lens` is the lens layout in grid cells, or null, and `maxRadius` the
-// largest ring, used to estimate how much work the sums are.
+// `lens` is the lens layout in grid cells, or null; its radius is used to
+// estimate how much work the sums are.
 export function aperture(params, g) {
   const layout = LENSES[params.aperture];
   const lens = layout

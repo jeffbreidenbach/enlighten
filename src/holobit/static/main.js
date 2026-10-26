@@ -3,8 +3,8 @@
 // Shaders sum the light into float render targets: one for the slice
 // (R, G = complex amplitude) and one for the screen plane. Each frame
 // another shader turns the slice's phase and colors it. That image is the
-// texture of the slice in a small 3D scene. The source, aperture and
-// screen planes stand across the slice; in the flat view they are
+// texture of the slice in a small 3D scene. The aperture and screen
+// planes stand across the slice; in the flat view they are
 // squeezed to nothing, and switching views swings the camera round while
 // they grow out of their lines into planes.
 
@@ -427,31 +427,10 @@ function makePlane(x, texture, size) {
   return { mesh, edges };
 }
 
-// The source and aperture planes are as big as the aperture; the screen
-// is the full height of the slice.
+// The aperture plane is as big as the aperture; the screen is the full
+// height of the slice. There is no plane at the source: the slice already
+// shows where the light starts, and a plane wave has no single source.
 const A = g.apertureSize;
-const sourceTex = canvasTexture(A);
-
-// Draws the source plane: faintly tinted, with a glow at the point source,
-// or evenly lit for a plane wave, which comes from no single point.
-function drawSource() {
-  const ctx = sourceTex.image.getContext("2d");
-  const mid = A / 2;
-  // Canvas rows run top down, so raising the source moves it up the canvas.
-  const y = mid - g.srcH;
-  ctx.clearRect(0, 0, A, A);
-  ctx.fillStyle = g.plane ? "rgba(255, 255, 255, 0.18)" : "rgba(150, 170, 220, 0.06)";
-  ctx.fillRect(0, 0, A, A);
-  if (!g.plane) {
-    const glow = ctx.createRadialGradient(mid, y, 0, mid, y, A * 0.12);
-    glow.addColorStop(0, "rgba(255, 255, 255, 1)");
-    glow.addColorStop(1, "rgba(255, 255, 255, 0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, A, A);
-  }
-  sourceTex.needsUpdate = true;
-}
-
 const apertureTex = canvasTexture(A);
 
 // Draws the aperture plane face on: wall, and either full-width slits or
@@ -489,7 +468,6 @@ function drawAperture(ap) {
 }
 
 const planes = [
-  makePlane(g.srcX + 0.5, sourceTex, A),
   makePlane(g.barrierX + 0.5, apertureTex, A),
   makePlane(g.screenX, screenColorRT.texture, g.H),
 ];
@@ -568,7 +546,6 @@ function startCompute() {
   U.uCount.value = ap.count;
   U.uHue.value.set(...wavelengthColor(params.wavelength).map((c) => c / 255));
   drawAperture(ap);
-  drawSource();
 
   // Rough sums per pixel: one per slit row, or for the lenses one per
   // point averaged around each ring (see the shader).

@@ -1,7 +1,7 @@
 [project]
 name = "holobit"
 version = "0.1.0"
-description = "Hello World web server"
+description = "Browser-based light simulator for teaching holography"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []

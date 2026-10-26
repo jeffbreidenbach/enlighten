@@ -1,33 +1,57 @@
-// The control panel: the controls on the left, and on the right a short
-// explanation of whatever was just changed. Changing the aperture, light,
-// wavelength, source height or beam angle calls onChange, which
-// recomputes the light; the view button switches between the flat slice
-// and the oblique view of the planes.
+// The control panel: the controls on the left, then a short explanation
+// of whatever was just changed, then the tour's back and next buttons.
+// Changing the aperture, light, wavelength, source height or beam angle
+// calls onChange, which recomputes the light; the view button switches
+// between the flat slice and the oblique view of the planes.
 
 import { EXPLANATIONS } from "./explanations.js";
 import { APERTURES, DEFAULT_WAVELENGTH } from "./optics.js";
+import { TOUR } from "./tour.js";
+
+const DEFAULTS = {
+  aperture: "single",
+  light: "point",
+  wavelength: DEFAULT_WAVELENGTH,
+  sourceHeight: 0,
+  beamAngle: 45,
+  view: "slice",
+};
+
+// When a tour step moves a slider, it sweeps there instead of jumping:
+// one step every SWEEP_STEP_MS, of this size for each slider. Across the
+// whole spectrum takes about a second and a half; 0 to 45 degrees, under
+// a second.
+const SWEEP_STEP_MS = 50;
+const SWEEP_SIZES = { wavelength: 10, sourceHeight: 2, beamAngle: 3 };
+
+// The full settings at each tour step: each step's changes on top of the
+// ones before it, so stepping back restores everything.
+const TOUR_STATES = TOUR.reduce((states, step) => {
+  const before = states.at(-1) ?? DEFAULTS;
+  return [...states, { ...before, ...step.set }];
+}, []);
 
 export function createControls(panel, { onChange }) {
-  const params = {
-    aperture: "single",
-    light: "point",
-    wavelength: DEFAULT_WAVELENGTH,
-    sourceHeight: 0,
-    beamAngle: 45,
-    view: "slice",
-  };
+  const params = { ...DEFAULTS };
+  // A tour step's slider sweep in progress. Touching any control stops
+  // it, so the sweep never fights a hand on a slider.
+  let sweep = null;
+  panel.addEventListener("input", () => clearInterval(sweep), { capture: true });
+  panel.addEventListener("change", () => clearInterval(sweep), { capture: true });
 
   const group = document.createElement("div");
   group.className = "controls";
   const text = document.createElement("p");
   text.className = "explain";
   panel.append(group, text);
-  const explain = (key) => (text.textContent = EXPLANATIONS[key]);
+  const explain = (key) => {
+    const entry = EXPLANATIONS[key];
+    text.textContent = typeof entry === "function" ? entry(params) : entry;
+  };
 
   const apRow = row(group, "Aperture");
   const apSelect = document.createElement("select");
   for (const [key, label] of Object.entries(APERTURES)) apSelect.add(new Option(label, key));
-  apSelect.value = params.aperture;
   apSelect.addEventListener("change", () => {
     params.aperture = apSelect.value;
     explain(params.aperture);
@@ -41,27 +65,19 @@ export function createControls(panel, { onChange }) {
   const lightSelect = document.createElement("select");
   lightSelect.add(new Option("Point source", "point"));
   lightSelect.add(new Option("Plane wave", "plane"));
-  const showLightSlider = () => {
-    heightRow.hidden = params.light !== "point";
-    angleRow.hidden = params.light !== "plane";
-  };
   lightSelect.addEventListener("change", () => {
     params.light = lightSelect.value;
-    showLightSlider();
+    sync();
     explain(params.light);
     onChange();
   });
   lightRow.append(lightSelect);
 
+  // Each slider and its readout, so sync() can set them.
+  const sliders = {};
   const slider = (label, key, { min, max, step, format }) => {
-    const input = Object.assign(document.createElement("input"), {
-      type: "range",
-      min,
-      max,
-      step,
-      value: params[key],
-    });
-    const out = Object.assign(document.createElement("output"), { value: format(params[key]) });
+    const input = Object.assign(document.createElement("input"), { type: "range", min, max, step });
+    const out = document.createElement("output");
     input.addEventListener("input", () => {
       params[key] = Number(input.value);
       out.value = format(params[key]);
@@ -70,40 +86,104 @@ export function createControls(panel, { onChange }) {
     });
     const r = row(group, label);
     r.append(input, out);
-    return r;
+    sliders[key] = { input, out, format, row: r };
   };
 
   slider("Wavelength", "wavelength", { min: 400, max: 700, step: 10, format: (v) => `${v} nm` });
   const signed = (v) => (v > 0 ? `+${v}` : `${v}`);
   // In base cells above the axis, up to the aperture plane's edge (it is
   // 80 cells tall).
-  const heightRow = slider("Source height", "sourceHeight", {
-    min: -40,
-    max: 40,
-    step: 2,
-    format: signed,
-  });
+  slider("Source height", "sourceHeight", { min: -40, max: 40, step: 2, format: signed });
   // Degrees from the axis; positive comes from above.
-  const angleRow = slider("Beam angle", "beamAngle", {
-    min: -60,
-    max: 60,
-    step: 1,
-    format: (v) => `${signed(v)}°`,
-  });
-  showLightSlider();
+  slider("Beam angle", "beamAngle", { min: -60, max: 60, step: 1, format: (v) => `${signed(v)}°` });
 
   const buttons = document.createElement("div");
   buttons.className = "buttons";
-  const view = Object.assign(document.createElement("button"), { textContent: "Full View" });
+  const view = document.createElement("button");
   view.addEventListener("click", () => {
     params.view = params.view === "slice" ? "planes" : "slice";
-    view.textContent = params.view === "slice" ? "Full View" : "Cross Section";
+    sync();
     explain(params.view === "slice" ? "cross" : "full");
   });
   buttons.append(view);
   group.append(buttons);
 
-  explain(params.aperture);
+  // Makes every control show what params holds.
+  function sync() {
+    apSelect.value = params.aperture;
+    lightSelect.value = params.light;
+    for (const [key, s] of Object.entries(sliders)) {
+      s.input.value = params[key];
+      s.out.value = s.format(params[key]);
+    }
+    sliders.sourceHeight.row.hidden = params.light !== "point";
+    sliders.beamAngle.row.hidden = params.light !== "plane";
+    view.textContent = params.view === "slice" ? "Full View" : "Cross Section";
+  }
+
+  // The tour: back and next arrows with the step number between them.
+  // Changing a control by hand leaves the tour where it was.
+  const tour = document.createElement("div");
+  tour.className = "tour";
+  const back = Object.assign(document.createElement("button"), {
+    textContent: "◀",
+    title: "Previous step",
+  });
+  const count = document.createElement("span");
+  const next = Object.assign(document.createElement("button"), {
+    textContent: "▶",
+    title: "Next step",
+  });
+  tour.append(back, count, next);
+  panel.append(tour);
+
+  let step = 0;
+  // Shows tour step i. Sliders the step moves sweep through the values in
+  // between instead of jumping, so the rainbow or the tilt plays out. The
+  // first call, while the page is starting, only sets the controls: the
+  // light is computed once everything is ready.
+  function goTo(i, { initial = false } = {}) {
+    clearInterval(sweep);
+    step = i;
+    const from = { ...params };
+    Object.assign(params, TOUR_STATES[step]);
+    const targets = {};
+    // Only sliders already in view sweep; one that appears with this step
+    // (the beam angle when the plane wave is first chosen) just starts at
+    // its value.
+    const shown = (state, key) =>
+      key === "wavelength" || (key === "sourceHeight") === (state.light === "point");
+    for (const key of Object.keys(SWEEP_SIZES)) {
+      if (initial || params[key] === from[key]) continue;
+      if (!shown(from, key) || !shown(params, key)) continue;
+      targets[key] = params[key];
+      params[key] = from[key];
+    }
+    if (Object.keys(targets).length > 0) {
+      sweep = setInterval(() => {
+        let done = true;
+        for (const [key, to] of Object.entries(targets)) {
+          const size = SWEEP_SIZES[key];
+          const left = to - params[key];
+          params[key] += Math.sign(left) * Math.min(size, Math.abs(left));
+          if (params[key] !== to) done = false;
+        }
+        if (done) clearInterval(sweep);
+        sync();
+        onChange();
+      }, SWEEP_STEP_MS);
+    }
+    sync();
+    text.textContent = TOUR[step].text;
+    count.textContent = `${step + 1} / ${TOUR.length}`;
+    back.disabled = step === 0;
+    next.disabled = step === TOUR.length - 1;
+    if (!initial) onChange();
+  }
+  back.addEventListener("click", () => goTo(step - 1));
+  next.addEventListener("click", () => goTo(step + 1));
+  goTo(0, { initial: true });
+
   return { params };
 }
 
