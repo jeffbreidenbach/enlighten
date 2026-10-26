@@ -2,10 +2,11 @@
 // of whatever was just changed, then the tour's back and next buttons.
 // Changing the aperture, light, wavelength, source height or beam angle
 // calls onChange, which recomputes the light; the view button switches
-// between the flat slice and the oblique view of the planes.
+// between the cross section and the full view.
 
+import { APERTURES } from "../physics/aperture.js";
+import { DEFAULT_WAVELENGTH } from "../physics/layout.js";
 import { EXPLANATIONS } from "./explanations.js";
-import { APERTURES, DEFAULT_WAVELENGTH } from "./optics.js";
 import { TOUR } from "./tour.js";
 
 const DEFAULTS = {
@@ -14,7 +15,7 @@ const DEFAULTS = {
   wavelength: DEFAULT_WAVELENGTH,
   sourceHeight: 0,
   beamAngle: 45,
-  view: "slice",
+  view: "cross",
 };
 
 // When a tour step moves a slider, it sweeps there instead of jumping:
@@ -91,7 +92,7 @@ export function createControls(panel, { onChange }) {
 
   slider("Wavelength", "wavelength", { min: 400, max: 700, step: 10, format: (v) => `${v} nm` });
   const signed = (v) => (v > 0 ? `+${v}` : `${v}`);
-  // In base cells above the axis, up to the aperture plane's edge (it is
+  // In base cells above the axis, up to the aperture plate's edge (it is
   // 80 cells tall).
   slider("Source height", "sourceHeight", { min: -40, max: 40, step: 2, format: signed });
   // Degrees from the axis; positive comes from above.
@@ -101,9 +102,9 @@ export function createControls(panel, { onChange }) {
   buttons.className = "buttons";
   const view = document.createElement("button");
   view.addEventListener("click", () => {
-    params.view = params.view === "slice" ? "planes" : "slice";
+    params.view = params.view === "cross" ? "full" : "cross";
     sync();
-    explain(params.view === "slice" ? "cross" : "full");
+    explain(params.view);
   });
   buttons.append(view);
   group.append(buttons);
@@ -118,7 +119,7 @@ export function createControls(panel, { onChange }) {
     }
     sliders.sourceHeight.row.hidden = params.light !== "point";
     sliders.beamAngle.row.hidden = params.light !== "plane";
-    view.textContent = params.view === "slice" ? "Full View" : "Cross Section";
+    view.textContent = params.view === "cross" ? "Full View" : "Cross Section";
   }
 
   // The tour: back and next arrows with the step number between them.

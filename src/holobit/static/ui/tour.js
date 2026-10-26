@@ -36,13 +36,13 @@ export const TOUR = [
       "from. Recording that information is the whole idea of a hologram.",
   },
   {
-    set: { sourceHeight: 0, view: "planes" },
+    set: { sourceHeight: 0, view: "full" },
     text:
       "Step back to see the whole setup: the light source, the plate with the slits, and the " +
       "screen. A piece of film where the screen is would record those fringes.",
   },
   {
-    set: { view: "slice", light: "plane", beamAngle: 0 },
+    set: { view: "cross", light: "plane", beamAngle: 0 },
     text:
       "Now the light is a plane wave, with flat wavefronts all moving one way, like a laser beam. " +
       "Holograms are recorded and replayed with light like this, called the reference beam.",
@@ -70,7 +70,7 @@ export const TOUR = [
       "that point.",
   },
   {
-    set: { view: "planes" },
+    set: { view: "full" },
     text:
       "From the side, the light bends up and converges from the lens to a bright spot on the " +
       "screen. A hologram of a whole object is the sum of such lenses, one for every point of the " +

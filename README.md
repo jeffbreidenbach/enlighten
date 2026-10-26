@@ -29,8 +29,12 @@ set `HOST` (for example `HOST=127.0.0.1` to keep it private) and `PORT` to chang
 
 - `src/holobit/__init__.py`: a small static file server.
 - `src/holobit/static/`: the simulator.
-  - `optics.js`: scene layout, apertures and physics constants.
-  - `main.js`: the shaders and the three.js scene.
-  - `controls.js`: the toolbar and the tour's controls.
-  - `explanations.js`, `tour.js`: the teaching texts.
+  - `physics/`: the core calculation.
+    - `layout.js`: where everything sits, and the scale.
+    - `aperture.js`: turns each aperture into the wavelets it sends on.
+    - `wavefield.js`: the GPU shaders that add those wavelets up at every point.
+  - `view/`: how the light is drawn (`display.js`) and the 3D scene (`scene.js`).
+  - `ui/`: the toolbar (`controls.js`), its explanations (`explanations.js`) and the guided
+    tour (`tour.js`).
+  - `main.js`: wires it together and runs the calculation and the animation.
   - `vendor/`: three.js r170 (MIT).
