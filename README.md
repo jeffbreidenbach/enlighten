@@ -22,8 +22,14 @@ The light is computed by summing Huygens wavelets from the aperture plate in Web
 uv run holobit
 ```
 
-Then open http://localhost:8000. The server listens on all interfaces (`0.0.0.0`) on port 8000;
-set `HOST` (for example `HOST=127.0.0.1` to keep it private) and `PORT` to change that.
+To keep it out of the way of crawlers, the app is served only under a random, unguessable path,
+which the server prints at startup (for example `http://0.0.0.0:8000/k7Fq…/`). The path is
+generated on the first run and saved in `.secret-path` (not committed), so it stays the same
+across restarts; set `HOLOBIT_PATH` to choose it yourself. Everything else returns 404, apart
+from a `robots.txt` that disallows all crawling, and every response asks not to be indexed.
+
+The server listens on all interfaces (`0.0.0.0`) on port 8000; set `HOST` (for example
+`HOST=127.0.0.1` to keep it private) and `PORT` to change that.
 
 ## Layout
 
