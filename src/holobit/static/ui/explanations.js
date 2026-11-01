@@ -48,14 +48,16 @@ export const EXPLANATIONS = {
     "Wavelength sets the color. Longer, redder waves bend more at the same slits or grating, so " +
     "their patterns spread wider; shorter, bluer waves spread less. That is why a hologram lit by " +
     "white light shimmers with color.",
-  sourceHeight:
-    "Raising the source moves its light off the axis. The fringes slide, and a lens's spot moves " +
-    "to the opposite side: an upside-down image of the source. Every point of an object lands in " +
-    "its own place this way.",
-  beamAngle:
-    "Tilting the plane wave makes it cross the plate at an angle. This is the key idea of off-axis " +
-    "holography: with the reference beam at an angle, the image comes out in a different direction " +
-    "from the leftover light. At 45 degrees the grating's first order comes straight out.",
+  // The same angle for either light; what it shows depends on which.
+  angle: (params) =>
+    params.light === "point"
+      ? "Moving the source moves where its light comes from. The fringes slide, and a lens's spot " +
+        "moves to the opposite side: an upside-down image of the source. Every point of an object " +
+        "lands in its own place this way."
+      : "Tilting the plane wave makes it cross the plate at an angle. This is the key idea of " +
+        "off-axis holography: with the reference beam at an angle, the image comes out in a " +
+        "different direction from the leftover light. At 45 degrees the grating's first order " +
+        "comes straight out.",
 
   // Views.
   full:

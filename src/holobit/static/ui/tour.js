@@ -12,37 +12,37 @@ export const TOUR = [
       "new source. This is diffraction.",
   },
   {
-    set: { wavelength: 450 },
-    text:
-      "Shorter waves are bluer. Notice how the crests crowd closer together. The size of a wave " +
-      "compared with the slit decides how it spreads.",
-  },
-  {
-    set: { wavelength: 650 },
-    text:
-      "Longer waves are redder, and their crests are further apart. Everything that follows " +
-      "depends on wavelength, which is why holograms shimmer with color in white light.",
-  },
-  {
-    set: { wavelength: 550, aperture: "double" },
+    set: { aperture: "double" },
     text:
       "Two slits make two sources. Where their crests meet the light adds up; where a crest meets a " +
       "trough it cancels. The bright and dark bands on the screen are interference fringes.",
   },
   {
-    set: { sourceHeight: 20 },
+    set: { wavelength: 450 },
     text:
-      "Move the source up and the fringes slide down. The fringes record where the light came " +
-      "from. Recording that information is the whole idea of a hologram.",
+      "Shorter, bluer waves: the crests crowd closer together, and so do the fringes on the " +
+      "screen. Each color makes its own fringe spacing.",
   },
   {
-    set: { sourceHeight: 0, view: "full" },
+    set: { wavelength: 650 },
+    text:
+      "Longer, redder waves spread the fringes wider apart. Holograms bend light by color in just " +
+      "this way, which is why one lit by white light shimmers like a rainbow.",
+  },
+  {
+    set: { wavelength: 550, angle: 12 },
+    text:
+      "Back to green, and now move the source up. The fringes slide down: they record where the " +
+      "light came from. Recording that information is the whole idea of a hologram.",
+  },
+  {
+    set: { angle: 0, view: "full" },
     text:
       "Step back to see the whole setup: the light source, the plate with the slits, and the " +
       "screen. A piece of film where the screen is would record those fringes.",
   },
   {
-    set: { view: "cross", light: "plane", beamAngle: 0 },
+    set: { view: "cross", light: "plane" },
     text:
       "Now the light is a plane wave, with flat wavefronts all moving one way, like a laser beam. " +
       "Holograms are recorded and replayed with light like this, called the reference beam.",
@@ -55,14 +55,14 @@ export const TOUR = [
       "separate beams, called orders.",
   },
   {
-    set: { beamAngle: 45 },
+    set: { angle: 45 },
     text:
       "Tilt the beam to 45 degrees. Some light carries on at 45 degrees, but the grating bends the " +
       "rest straight ahead. Separating the useful beam from the leftover light this way is the key " +
       "to off-axis holography.",
   },
   {
-    set: { aperture: "lens", light: "point" },
+    set: { aperture: "lens", light: "point", angle: 0 },
     text:
       "A Fresnel lens is rings of fringes that bend every part of the wave toward one spot. This " +
       "one is off center, so it acts like a grating and a lens at once, steering the light up to a " +

@@ -24,6 +24,12 @@ export const DEFAULT_WAVELENGTH = 550;
 // The aperture plate is this tall (and wide), in base cells: about a
 // quarter of the screen.
 const APERTURE_SIZE = 80;
+// The aperture plate is 96 base cells in. At an incident angle of 0 the
+// point source sits at the left edge, just far enough in for its dot to
+// show; at other angles it moves along an arc, staying the same distance
+// from the plate's center.
+const APERTURE_X = 96;
+const SOURCE_DISTANCE = 93;
 
 // A wavelength's length in base cells.
 export function wavelengthCells(nm) {
@@ -37,10 +43,10 @@ export function geometry(params) {
   const W = BASE_W * scale;
   const H = BASE_H * scale;
   const stripW = 20 * scale;
-  // The plane wave's direction of travel within the slice: tilted down by
-  // the beam angle, so a positive angle comes from above, as a raised
-  // point source would.
-  const angle = (params.beamAngle * Math.PI) / 180;
+  // The incident angle: the direction the light arrives from at the
+  // center of the aperture plate, for either light. Positive comes from
+  // above.
+  const angle = (params.angle * Math.PI) / 180;
   return {
     scale,
     // The cross section, and the strip on its right where the screen is
@@ -50,18 +56,20 @@ export function geometry(params) {
     stripW,
     centerY: H / 2,
 
-    // The light: a point source at the left edge, just far enough in for
-    // its dot to show, at a height above the axis; or a plane wave.
+    // The light: a point source, at sourceY above the axis and
+    // sourceDistance from the plate's center; or a plane wave travelling
+    // along beamDir.
     planeWave: params.light === "plane",
-    sourceX: 3 * scale,
-    sourceY: params.sourceHeight * scale,
+    sourceX: (APERTURE_X - SOURCE_DISTANCE * Math.cos(angle)) * scale,
+    sourceY: SOURCE_DISTANCE * Math.sin(angle) * scale,
+    sourceDistance: SOURCE_DISTANCE * scale,
     beamDir: [Math.cos(angle), -Math.sin(angle)],
     // The wavenumber: 2 pi over the wavelength.
     k: (2 * Math.PI) / (wavelengthCells(params.wavelength) * scale),
 
-    // The aperture plate: 96 base cells in, as tall as APERTURE_SIZE, and
-    // drawn as a wall two grid cells thick.
-    apertureX: 96 * scale,
+    // The aperture plate, as tall as APERTURE_SIZE, drawn as a wall two
+    // grid cells thick.
+    apertureX: APERTURE_X * scale,
     apertureSize: APERTURE_SIZE * scale,
     wallHalf: scale,
 

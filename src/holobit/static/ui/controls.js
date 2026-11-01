@@ -1,7 +1,7 @@
 // The control panel: the controls on the left, then a short explanation
 // of whatever was just changed, then the tour's back and next buttons.
-// Changing the aperture, light, wavelength, source height or beam angle
-// calls onChange, which recomputes the light; the view button switches
+// Changing the aperture, light, wavelength or incident angle calls
+// onChange, which recomputes the light; the view button switches
 // between the cross section and the full view.
 
 import { APERTURES } from "../physics/aperture.js";
@@ -13,8 +13,7 @@ const DEFAULTS = {
   aperture: "single",
   light: "point",
   wavelength: DEFAULT_WAVELENGTH,
-  sourceHeight: 0,
-  beamAngle: 45,
+  angle: 0,
   view: "cross",
 };
 
@@ -23,7 +22,7 @@ const DEFAULTS = {
 // whole spectrum takes about a second and a half; 0 to 45 degrees, under
 // a second.
 const SWEEP_STEP_MS = 50;
-const SWEEP_SIZES = { wavelength: 10, sourceHeight: 2, beamAngle: 3 };
+const SWEEP_SIZES = { wavelength: 10, angle: 3 };
 
 // The full settings at each tour step: each step's changes on top of the
 // ones before it, so stepping back restores everything.
@@ -60,15 +59,12 @@ export function createControls(panel, { onChange }) {
   });
   apRow.append(apSelect);
 
-  // The point source is placed by its height; the plane wave is aimed by
-  // its angle. Only the slider for the chosen light shows.
   const lightRow = row(group, "Light");
   const lightSelect = document.createElement("select");
   lightSelect.add(new Option("Point source", "point"));
   lightSelect.add(new Option("Plane wave", "plane"));
   lightSelect.addEventListener("change", () => {
     params.light = lightSelect.value;
-    sync();
     explain(params.light);
     onChange();
   });
@@ -91,12 +87,15 @@ export function createControls(panel, { onChange }) {
   };
 
   slider("Wavelength", "wavelength", { min: 400, max: 700, step: 10, format: (v) => `${v} nm` });
-  const signed = (v) => (v > 0 ? `+${v}` : `${v}`);
-  // In base cells above the axis, up to the aperture plate's edge (it is
-  // 80 cells tall).
-  slider("Source height", "sourceHeight", { min: -40, max: 40, step: 2, format: signed });
-  // Degrees from the axis; positive comes from above.
-  slider("Beam angle", "beamAngle", { min: -60, max: 60, step: 1, format: (v) => `${signed(v)}°` });
+  // The direction the light arrives from at the center of the aperture
+  // plate, in degrees from the axis, for either light. Positive comes from
+  // above.
+  slider("Incident angle", "angle", {
+    min: -60,
+    max: 60,
+    step: 1,
+    format: (v) => `${v > 0 ? "+" : ""}${v}°`,
+  });
 
   const buttons = document.createElement("div");
   buttons.className = "buttons";
@@ -117,8 +116,6 @@ export function createControls(panel, { onChange }) {
       s.input.value = params[key];
       s.out.value = s.format(params[key]);
     }
-    sliders.sourceHeight.row.hidden = params.light !== "point";
-    sliders.beamAngle.row.hidden = params.light !== "plane";
     view.textContent = params.view === "cross" ? "Full View" : "Cross Section";
   }
 
@@ -140,23 +137,20 @@ export function createControls(panel, { onChange }) {
 
   let step = 0;
   // Shows tour step i. Sliders the step moves sweep through the values in
-  // between instead of jumping, so the rainbow or the tilt plays out. The
-  // first call, while the page is starting, only sets the controls: the
-  // light is computed once everything is ready.
+  // between instead of jumping, so the rainbow or the tilt plays out,
+  // except in a step that also changes the aperture or the light: there
+  // everything changes at once. The first call, while the page is
+  // starting, only sets the controls: the light is computed once
+  // everything is ready.
   function goTo(i, { initial = false } = {}) {
     clearInterval(sweep);
     step = i;
     const from = { ...params };
     Object.assign(params, TOUR_STATES[step]);
     const targets = {};
-    // Only sliders already in view sweep; one that appears with this step
-    // (the beam angle when the plane wave is first chosen) just starts at
-    // its value.
-    const shown = (state, key) =>
-      key === "wavelength" || (key === "sourceHeight") === (state.light === "point");
+    const jump = initial || params.aperture !== from.aperture || params.light !== from.light;
     for (const key of Object.keys(SWEEP_SIZES)) {
-      if (initial || params[key] === from[key]) continue;
-      if (!shown(from, key) || !shown(params, key)) continue;
+      if (jump || params[key] === from[key]) continue;
       targets[key] = params[key];
       params[key] = from[key];
     }

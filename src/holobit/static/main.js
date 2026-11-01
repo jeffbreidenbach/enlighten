@@ -98,8 +98,9 @@ const U = {
   uK: { value: 0 },
   uPlaneWave: { value: 0 },
   uBeamDir: { value: new THREE.Vector2() },
-  uSourceX: { value: g.sourceX },
+  uSourceX: { value: 0 },
   uSourceY: { value: 0 },
+  uSourceDistance: { value: g.sourceDistance },
   uApertureX: { value: g.apertureX },
   uWallHalf: { value: g.wallHalf },
   uApertureHalf: { value: g.apertureSize / 2 },
@@ -179,6 +180,7 @@ function startCompute() {
   U.uK.value = g.k;
   U.uPlaneWave.value = g.planeWave ? 1 : 0;
   U.uBeamDir.value.set(...g.beamDir);
+  U.uSourceX.value = g.sourceX;
   U.uSourceY.value = g.sourceY;
   U.uHue.value.set(...wavelengthColor(params.wavelength).map((c) => c / 255));
   drawAperture(ap, g);

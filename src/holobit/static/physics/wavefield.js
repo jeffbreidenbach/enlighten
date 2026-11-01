@@ -9,7 +9,8 @@
 // the screen plate. Both take these uniforms:
 //   uK             wavenumber, 2 pi / wavelength
 //   uPlaneWave     1 for a plane wave travelling along uBeamDir, 0 for
-//                  the point source at (uSourceX, uSourceY)
+//                  the point source at (uSourceX, uSourceY), which is
+//                  uSourceDistance from the plate's center
 //   uApertureX, uWallHalf, uApertureHalf, uCenterY
 //                  the plate's column, half its thickness, half its
 //                  height, and the axis's row
@@ -24,7 +25,7 @@ import { BEAM_FALLOFF, MODE_LENS, ROW_LENS, ROW_OPEN } from "./aperture.js";
 // The light at a point x along the axis and p across it, where p.y is the
 // height above the axis and p.x the distance out of the cross section.
 const WAVEFIELD = `
-uniform float uK, uSourceX, uSourceY, uApertureX, uWallHalf, uApertureHalf, uCenterY;
+uniform float uK, uSourceX, uSourceY, uSourceDistance, uApertureX, uWallHalf, uApertureHalf, uCenterY;
 uniform int uPlaneWave, uMode, uWaveletCount;
 uniform vec2 uBeamDir;
 uniform sampler2D uRows, uWavelets;
@@ -50,12 +51,12 @@ vec2 wavelet(float r, float dx) {
 
 // The light arriving from the source. The plane wave has strength 1 and
 // phase 0 where it crosses the plate's center. The point source's
-// spherical wave fades as 1/distance, scaled to strength 1 where it meets
-// the plate on the axis.
+// spherical wave fades as 1/distance, scaled to strength 1 at the plate's
+// center.
 vec2 incident(float x, vec2 p) {
   if (uPlaneWave == 1) return wave(dot(uBeamDir, vec2(x - uApertureX, p.y)));
   float d = length(vec3(x - uSourceX, p.x, p.y - uSourceY));
-  return (uApertureX - uSourceX) / max(d, 0.5) * wave(d);
+  return uSourceDistance / max(d, 0.5) * wave(d);
 }
 
 // The beam's soft edge (BEAM_FALLOFF in aperture.js), at point q of the

@@ -76,10 +76,10 @@ export const MODE_LENS = 1;
 // the path from the source (none for a plane wave, which comes from
 // infinitely far away) plus the path to the focus, compared with the path
 // straight through the center. The lens focuses on the screen. It is
-// fixed, so raising the source or tilting the wave moves the focus rather
-// than changing the lens.
+// fixed, so tilting the light moves the focus rather than changing the
+// lens.
 function lensDelay(g, rho) {
-  const toSource = g.apertureX - g.sourceX;
+  const toSource = g.sourceDistance;
   const toFocus = g.screenX - g.apertureX;
   const fromSource = g.planeWave ? 0 : Math.hypot(rho, toSource) - toSource;
   return g.k * (fromSource + Math.hypot(rho, toFocus) - toFocus);
@@ -121,7 +121,6 @@ export function aperture(params, g) {
   const kind = new Uint8Array(g.H);
   const block = new Float32Array(g.H);
   const groove = new Float32Array(g.H);
-  const toSource = g.apertureX - g.sourceX;
   const list = [];
 
   for (let row = 0; row < g.H; row++) {
@@ -159,8 +158,9 @@ export function aperture(params, g) {
     if (g.planeWave) {
       list.push([y, strength, g.k * g.beamDir[1] * y - Math.PI / 4, 0]);
     } else {
-      const R = Math.hypot(toSource, y - g.sourceY);
-      list.push([y, (strength * toSource) / Math.sqrt(R), g.k * R - Math.PI / 4, R]);
+      const R = Math.hypot(g.apertureX - g.sourceX, y - g.sourceY);
+      const scaled = (strength * g.sourceDistance) / Math.sqrt(R);
+      list.push([y, scaled, g.k * R - Math.PI / 4, R]);
     }
   }
 
