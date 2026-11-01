@@ -17,6 +17,7 @@ import { geometry } from "./physics/layout.js";
 import { FIELD_SHADER, SCREEN_SHADER, SCREEN_STEP } from "./physics/wavefield.js";
 import { createControls } from "./ui/controls.js";
 import {
+  FIELD_ROW_MAX_SHADER,
   phaseStep,
   SCREEN_COLOR_SHADER,
   SLICE_COLOR_SHADER,
@@ -89,6 +90,8 @@ const fieldRT = floatTarget(g.W, g.H);
 const screenRT = floatTarget(S, S);
 // What is drawn from it.
 const sliceColorRT = colorTarget(g.W + g.stripW, g.H);
+// The brightest light in each row of the cross section beyond the plate.
+const fieldRowMaxRT = floatTarget(1, g.H);
 const screenColorRT = colorTarget(S, S);
 
 // Per row of the aperture line: [kind, block, groove, 0].
@@ -115,6 +118,7 @@ const U = {
   uScreen: { value: screenRT.texture },
   uHue: { value: new THREE.Vector3() },
   uMaxIntensity: { value: 1e-9 },
+  uFieldMax: { value: 1 },
 };
 const uPhase = { value: new THREE.Vector2(1, 0) };
 const uStrip = { value: 1 };
@@ -133,6 +137,7 @@ function pass(fragmentShader, uniforms) {
 const fieldPass = pass(FIELD_SHADER, U);
 const screenPass = pass(SCREEN_SHADER, { ...U, uScreenX: { value: g.screenX } });
 const screenColorPass = pass(SCREEN_COLOR_SHADER, U);
+const fieldRowMaxPass = pass(FIELD_ROW_MAX_SHADER, { ...U, uField: { value: fieldRT.texture } });
 const sliceColorPass = pass(SLICE_COLOR_SHADER, {
   ...U,
   uField: { value: fieldRT.texture },
@@ -168,6 +173,7 @@ const readBack = new Float32Array(S * S * 4);
 // The brightest point of each row of the screen, as computed, so the
 // screen can be scaled to the brightest point it shows while it fills in.
 const rowMax = new Float32Array(S);
+const fieldRowMax = new Float32Array(g.H * 4);
 // The calculation in progress, or null when the light is up to date.
 let job = null;
 
@@ -194,7 +200,9 @@ function startCompute() {
 
   // Roughly how many wavelet sums each pixel needs: one per slit row, or
   // for the lenses one per point averaged around each ring.
-  const perPixel = ap.lens ? ap.count * (8 + 0.4 * g.k * ap.lens.radius) : ap.count;
+  const perPixel = ap.lens
+    ? ap.count * (8 + 0.4 * g.k * ap.lens.radius + (2 * ap.lens.radius) / (g.apertureSize / 2))
+    : ap.count;
   job = { fieldRow: 0, screenRow: 0, perPixel };
 }
 
@@ -215,6 +223,7 @@ function continueCompute() {
     return done + rows;
   };
   const screenStart = job.screenRow;
+  const fieldStart = job.fieldRow;
   const screenShare = (budget * S * S) / (g.W * g.H + S * S);
   if (job.screenRow < S) job.screenRow = band(screenPass, screenRT, job.screenRow, screenShare);
   while (budget > 0 && job.fieldRow < g.H) {
@@ -237,6 +246,15 @@ function continueCompute() {
     }
     U.uMaxIntensity.value = Math.max(1e-9, ...rowMax);
     runPass(screenColorPass, screenColorRT);
+  }
+  // Likewise scale the cross section to the brightest light beyond the
+  // plate, finding it on the GPU and reading back one value per row.
+  if (job.fieldRow > fieldStart) {
+    runPass(fieldRowMaxPass, fieldRowMaxRT);
+    renderer.readRenderTargetPixels(fieldRowMaxRT, 0, 0, 1, g.H, fieldRowMax);
+    let max = 1;
+    for (let i = 0; i < fieldRowMax.length; i += 4) max = Math.max(max, fieldRowMax[i]);
+    U.uFieldMax.value = max;
   }
   if (job.fieldRow >= g.H && job.screenRow >= S) job = null;
 }

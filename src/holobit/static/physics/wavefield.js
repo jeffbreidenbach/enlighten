@@ -91,12 +91,15 @@ vec2 lensRing(vec4 w, float dx, vec2 p) {
   vec2 pc = p - vec2(0.0, centerY);
   float toP2 = dx * dx + dot(pc, pc) + rho * rho;
   // The phase swings by about this much around the ring, so that many
-  // points, plus a margin, are enough for an accurate average. The
+  // points, plus a margin, are enough for an accurate average. The beam
+  // lights the ring unevenly too, a bump about as wide as the beam, so a
+  // ring large next to the beam needs more points to follow it; without
+  // them, the focus itself comes out too dark. The
   // arriving light's tilt across the ring is at most its tilt at the
   // plate's center plus what its curvature adds.
   float tilt = min(abs(uBeamDir.y) + uCurvature * (abs(centerY) + rho), 1.0);
   float swing = uK * rho * (length(pc) / sqrt(toP2) + tilt);
-  int n = min(int(swing) + 8, 256);
+  int n = min(int(swing + 4.0 * rho / uApertureHalf) + 8, 256);
   vec2 sum = vec2(0.0);
   for (int j = 0; j < n; j++) {
     float phi = (float(j) + 0.5) * TAU / float(n);

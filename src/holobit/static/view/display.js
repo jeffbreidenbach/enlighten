@@ -46,6 +46,21 @@ void main() {
   outColor = vec4(uHue * clamp(i / uMaxIntensity, 0.0, 1.0), 1.0);
 }`;
 
+// The brightest light in each row of the cross section beyond the aperture
+// plate, into a texture one pixel wide.
+export const FIELD_ROW_MAX_SHADER = `${HEAD}
+uniform sampler2D uField;
+uniform float uApertureX, uWallHalf;
+out vec4 outColor;
+void main() {
+  int row = int(gl_FragCoord.y);
+  float m = 0.0;
+  for (int x = int(uApertureX + uWallHalf) + 1; x < textureSize(uField, 0).x; x++) {
+    m = max(m, length(texelFetch(uField, ivec2(x, row), 0).xy));
+  }
+  outColor = vec4(m);
+}`;
+
 // The cross section: the waves themselves, the aperture plate's wall, the
 // source, and the screen seen edge-on in the strip on the right. It is
 // added on top of the 3D scene, so black means clear.
@@ -54,7 +69,7 @@ const float STEP = ${float(SCREEN_STEP)};
 uniform sampler2D uField, uRows, uScreen;
 uniform vec2 uPhase, uBeamDir;
 uniform vec3 uHue;
-uniform float uMaxIntensity, uWidth, uScale, uSourceX, uSourceY, uCurvature, uCenterY;
+uniform float uMaxIntensity, uFieldMax, uWidth, uScale, uSourceX, uSourceY, uCurvature, uCenterY;
 uniform float uApertureX, uWallHalf, uApertureHalf;
 // How much of the screen strip shows: 1 in the cross section, fading to 0
 // in the full view, where the screen plate itself stands there.
@@ -106,11 +121,14 @@ void main() {
     } else {
       // Each wave is a smooth cosine at this moment's phase: brightest at
       // the crest, dark in the trough. Its strength sets the brightness in
-      // proportion, so weak light looks genuinely weak.
+      // proportion, so weak light looks genuinely weak, scaled so the
+      // brightest light beyond the plate is just at full brightness, or
+      // the incoming beam if that is brighter. Only the source's light
+      // close to the source, which grows without limit, is cut off.
       vec2 u = texelFetch(uField, ivec2(c), 0).xy;
       float strength = length(u);
       float shade = 0.5 + 0.5 * dot(u, uPhase) / max(strength, 1e-6);
-      rgb = uHue * shade * min(strength, 1.0) * beam(c);
+      rgb = uHue * shade * min(strength / uFieldMax, 1.0) * beam(c);
     }
   } else if (c.x >= uWidth + 2.0 * uScale) {
     // The screen strip: the center line of the screen plate, which is
