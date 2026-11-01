@@ -127,6 +127,11 @@ vec2 lightAt(float x, vec2 p) {
   return u;
 }`;
 
+// The screen is computed at every SCREEN_STEP grid cells, half the
+// resolution of the cross section: a quarter of the work, and its
+// patterns, the lenses' spots included, are far wider than that.
+export const SCREEN_STEP = 2;
+
 // The cross section: R, G = the light's complex amplitude.
 export const FIELD_SHADER = `${HEAD}${WAVEFIELD}
 out vec4 outColor;
@@ -136,13 +141,14 @@ void main() {
 }`;
 
 // The screen plate, seen face on: R, G = complex amplitude, B = intensity.
-// Full-width slits give the same light all the way across, so only the
-// height matters for them.
+// Each pixel is the light at the middle of the SCREEN_STEP grid cells it
+// covers. Full-width slits give the same light all the
+// way across, so only the height matters for them.
 export const SCREEN_SHADER = `${HEAD}${WAVEFIELD}
 uniform float uScreenX;
 out vec4 outColor;
 void main() {
-  vec2 p = floor(gl_FragCoord.xy) - uCenterY;
+  vec2 p = (floor(gl_FragCoord.xy) + 0.5) * ${float(SCREEN_STEP)} - 0.5 - uCenterY;
   vec2 u = lightAt(uScreenX, uMode == ${MODE_LENS} ? p : vec2(0.0, p.y));
   outColor = vec4(u, dot(u, u), 0.0);
 }`;

@@ -21,9 +21,12 @@ const SCALE = 2;
 const CELLS_PER_NM = 4 / 550;
 export const DEFAULT_WAVELENGTH = 550;
 
-// The aperture plate is this tall (and wide), in base cells: about a
-// quarter of the screen.
-const APERTURE_SIZE = 80;
+// The aperture plate is square, and by default this tall, in base cells:
+// about a quarter of the screen. The plate size slider runs from
+// MIN_PLATE to MAX_PLATE.
+export const DEFAULT_PLATE = 80;
+export const MIN_PLATE = 48;
+export const MAX_PLATE = 160;
 // The aperture plate is 96 base cells in. At its nearest, and an incident
 // angle of 0, the point source sits at the left edge, just far enough in
 // for its dot to show; at other angles it moves along an arc, staying the
@@ -46,9 +49,14 @@ function curvature(distance) {
   return (1 - distance / FARTHEST) / NEAREST_SOURCE;
 }
 
+// A length in base cells, in micrometres.
+export function microns(cells) {
+  return cells / CELLS_PER_NM / 1000;
+}
+
 // The source's distance from the plate, in micrometres, or Infinity.
 export function sourceMicrons(distance) {
-  return 1 / curvature(distance) / CELLS_PER_NM / 1000;
+  return microns(1 / curvature(distance));
 }
 
 // Everything the calculation and the drawing need to know about the
@@ -86,10 +94,11 @@ export function geometry(params) {
     // The wavenumber: 2 pi over the wavelength.
     k: (2 * Math.PI) / (wavelengthCells(params.wavelength) * scale),
 
-    // The aperture plate, as tall as APERTURE_SIZE, drawn as a wall two
-    // grid cells thick.
+    // The aperture plate, params.plate base cells tall, drawn as a wall
+    // two grid cells thick, and the largest it can be.
     apertureX: APERTURE_X * scale,
-    apertureSize: APERTURE_SIZE * scale,
+    apertureSize: params.plate * scale,
+    maxApertureSize: MAX_PLATE * scale,
     wallHalf: scale,
 
     // The screen, in the middle of the strip.

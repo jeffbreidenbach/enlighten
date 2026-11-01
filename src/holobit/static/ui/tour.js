@@ -30,7 +30,7 @@ export const TOUR = [
       "this way, which is why one lit by white light shimmers like a rainbow.",
   },
   {
-    set: { angle: 12 },
+    set: { angle: 45 },
     text:
       "Now move the source up. The fringes slide down: they record where the light came from. " +
       "Recording that information is the whole idea of a hologram.",
@@ -42,14 +42,14 @@ export const TOUR = [
       "recorded together.",
   },
   {
-    set: { angle: 0 },
-    text: "Bring the source back to the middle, and the fringes slide back with it.",
-  },
-  {
     set: { view: "full" },
     text:
-      "Step back to see the whole setup: the light source, the plate with the slits, and the " +
-      "screen. A piece of film where the screen is would record those fringes.",
+      "Step back to see the whole setup: the light source, raised above the axis, the plate with " +
+      "the slits, and the screen. A piece of film where the screen is would record those fringes.",
+  },
+  {
+    set: { angle: 0 },
+    text: "Bring the source back to the middle, and the fringes slide back with it.",
   },
   {
     set: { distance: 100 },
@@ -105,5 +105,11 @@ export const TOUR = [
       "Two lenses on one plate focus light to two points at once. Add enough points and you have " +
       "an image. A holographic stereogram builds its image from many small holograms, each showing " +
       "the scene from a different viewpoint.",
+  },
+  {
+    set: { plate: 160 },
+    text:
+      "Double the size of the plate. With twice as much of each lens lit, the spots shrink to " +
+      "half the size: the bigger the hologram, the sharper the image it can make.",
   },
 ];

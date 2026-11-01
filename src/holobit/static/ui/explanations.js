@@ -37,6 +37,10 @@ export const EXPLANATIONS = {
     "holographic stereogram goes one step further, stitching together many such views.",
 
   // Sliders.
+  plate:
+    "The plate sets how wide the beam is. A wider beam spreads less, so a bigger plate makes " +
+    "sharper beams: the grating's orders narrow, and a lens's spot shrinks. How sharp a " +
+    "hologram's image can be depends on how big the hologram is.",
   distance: (params) =>
     params.distance === FARTHEST
       ? "Infinitely far away, the source's wavefronts are flat: a plane wave, all travelling one " +

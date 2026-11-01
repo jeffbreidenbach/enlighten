@@ -42,9 +42,10 @@ export function createScene(g, sliceTexture, screenTexture) {
 
   // A square plate `size` grid cells across, standing across the axis at
   // grid column x. Turned to face along the axis, its local x runs out of
-  // the cross section, so scaling that squeezes it to a line.
+  // the cross section, so scaling that squeezes it to a line. It is built
+  // one unit across and scaled to its size, so it can be resized.
   function makePlate(x, texture, size) {
-    const geo = new THREE.PlaneGeometry(size * UNIT, size * UNIT);
+    const geo = new THREE.PlaneGeometry(UNIT, UNIT);
     const mesh = new THREE.Mesh(
       geo,
       new THREE.MeshBasicMaterial({
@@ -62,26 +63,32 @@ export function createScene(g, sliceTexture, screenTexture) {
     mesh.add(edges);
     mesh.position.x = (x - totalW / 2) * UNIT;
     mesh.rotation.y = Math.PI / 2;
+    mesh.scale.y = size;
     scene.add(mesh);
-    return { mesh, edges };
+    return { mesh, edges, size };
   }
 
-  // The aperture plate is as big as the aperture, and painted on a canvas;
-  // the screen is as tall as the cross section. There is no plate at the
+  // The aperture plate is painted on a canvas big enough for the largest
+  // plate, of which only the corner the plate's size needs is shown; the
+  // screen is as tall as the cross section. There is no plate at the
   // source: the cross section already shows where the light starts, and a
   // plane wave has no single source.
-  const A = g.apertureSize;
-  const apertureCanvas = Object.assign(document.createElement("canvas"), { width: A, height: A });
+  const M = g.maxApertureSize;
+  const apertureCanvas = Object.assign(document.createElement("canvas"), { width: M, height: M });
   const apertureTexture = new THREE.CanvasTexture(apertureCanvas);
-  const plates = [
-    makePlate(g.apertureX + 0.5, apertureTexture, A),
-    makePlate(g.screenX, screenTexture, g.H),
-  ];
+  const aperturePlate = makePlate(g.apertureX + 0.5, apertureTexture, g.apertureSize);
+  const plates = [aperturePlate, makePlate(g.screenX, screenTexture, g.H)];
 
   // Paints the aperture plate face on: wall, and either full-width slits
   // (the sine grating's shaded by how much they block) or round lenses
   // shaded by their grooves (averaged where two overlap).
   function drawAperture(ap, g) {
+    const A = g.apertureSize;
+    aperturePlate.size = A;
+    aperturePlate.mesh.scale.y = A;
+    // The canvas's top-left corner; textures run bottom up.
+    apertureTexture.repeat.set(A / M, A / M);
+    apertureTexture.offset.set(0, 1 - A / M);
     const ctx = apertureCanvas.getContext("2d");
     const img = ctx.createImageData(A, A);
     for (let cy = 0; cy < A; cy++) {
@@ -140,8 +147,8 @@ export function createScene(g, sliceTexture, screenTexture) {
     camera.position.add(pin);
     camera.lookAt(pin);
 
-    for (const { mesh, edges } of plates) {
-      mesh.scale.x = Math.max(e, 1e-4);
+    for (const { mesh, edges, size } of plates) {
+      mesh.scale.x = Math.max(e, 1e-4) * size;
       mesh.material.opacity = e;
       edges.material.opacity = 0.8 * e;
     }

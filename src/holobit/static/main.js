@@ -6,14 +6,15 @@
 // - ui/: the controls, their explanations and the tour.
 //
 // When a setting changes, the light is recomputed into float textures,
-// a band of rows per frame. Every frame the cross section is colored at
-// the current phase, so the waves move, and the scene is drawn.
+// bands of rows of the cross section and the screen each frame, the
+// screen shown as it fills in. Every frame the cross section is colored
+// at the current phase, so the waves move, and the scene is drawn.
 
 import * as THREE from "three";
 import { FULLSCREEN_VERTEX } from "./glsl.js";
 import { aperture } from "./physics/aperture.js";
 import { geometry } from "./physics/layout.js";
-import { FIELD_SHADER, SCREEN_SHADER } from "./physics/wavefield.js";
+import { FIELD_SHADER, SCREEN_SHADER, SCREEN_STEP } from "./physics/wavefield.js";
 import { createControls } from "./ui/controls.js";
 import {
   phaseStep,
@@ -50,8 +51,9 @@ let dirty = true;
 const { params } = createControls(document.getElementById("controls"), {
   onChange: () => (dirty = true),
 });
-// The layout's sizes don't change with the settings, so the targets and
-// scene are built once from the first geometry.
+// The layout's sizes don't change with the settings, apart from the
+// plate's, so the targets and scene are built once from the first
+// geometry.
 let g = geometry(params);
 
 // ---- Textures --------------------------------------------------------------
@@ -80,12 +82,14 @@ function dataTexture(data) {
   return tex;
 }
 
-// The computed light: the cross section, and the screen face on.
+// The computed light: the cross section, and the screen face on, more
+// coarsely.
+const S = g.H / SCREEN_STEP;
 const fieldRT = floatTarget(g.W, g.H);
-const screenRT = floatTarget(g.H, g.H);
+const screenRT = floatTarget(S, S);
 // What is drawn from it.
 const sliceColorRT = colorTarget(g.W + g.stripW, g.H);
-const screenColorRT = colorTarget(g.H, g.H);
+const screenColorRT = colorTarget(S, S);
 
 // Per row of the aperture line: [kind, block, groove, 0].
 const rowsData = new Float32Array(g.H * 4);
@@ -160,7 +164,10 @@ function runPass(material, target, row, rows) {
 // ---- Computing the light ----------------------------------------------------
 
 const { scene, camera, layout, drawAperture } = createScene(g, sliceColorRT.texture, screenColorRT.texture);
-const readBack = new Float32Array(g.H * g.H * 4);
+const readBack = new Float32Array(S * S * 4);
+// The brightest point of each row of the screen, as computed, so the
+// screen can be scaled to the brightest point it shows while it fills in.
+const rowMax = new Float32Array(S);
 // The calculation in progress, or null when the light is up to date.
 let job = null;
 
@@ -178,6 +185,7 @@ function startCompute() {
   U.uMode.value = ap.mode;
   U.uK.value = g.k;
   U.uCurvature.value = g.curvature;
+  U.uApertureHalf.value = g.apertureSize / 2;
   U.uBeamDir.value.set(...g.beamDir);
   U.uSourceX.value = g.sourceX;
   U.uSourceY.value = g.sourceY;
@@ -190,29 +198,47 @@ function startCompute() {
   job = { fieldRow: 0, screenRow: 0, perPixel };
 }
 
-// Does one frame's share of the calculation, finishing it if it can.
+// Does one frame's share of the calculation. The cross section and the
+// screen share the frame's budget in proportion to their size, so they
+// fill in together; whatever one leaves, the other takes.
 function continueCompute() {
   let budget = SUMS_PER_FRAME;
-  const band = (material, target, done) => {
+  // Computes rows of target from row done on, using up to `share` sums.
+  // Returns the row reached.
+  const band = (material, target, done, share) => {
     const rows = Math.min(
       target.height - done,
-      Math.max(1, Math.floor(budget / (target.width * job.perPixel))),
+      Math.max(1, Math.floor(share / (target.width * job.perPixel))),
     );
     runPass(material, target, done, rows);
     budget -= rows * target.width * job.perPixel;
     return done + rows;
   };
-  while (budget > 0 && job.fieldRow < g.H) job.fieldRow = band(fieldPass, fieldRT, job.fieldRow);
-  while (budget > 0 && job.screenRow < g.H) job.screenRow = band(screenPass, screenRT, job.screenRow);
-  if (job.screenRow < g.H) return;
+  const screenStart = job.screenRow;
+  const screenShare = (budget * S * S) / (g.W * g.H + S * S);
+  if (job.screenRow < S) job.screenRow = band(screenPass, screenRT, job.screenRow, screenShare);
+  while (budget > 0 && job.fieldRow < g.H) {
+    job.fieldRow = band(fieldPass, fieldRT, job.fieldRow, budget);
+  }
+  while (budget > 0 && job.screenRow < S) {
+    job.screenRow = band(screenPass, screenRT, job.screenRow, budget);
+  }
 
-  // Read the screen back once to scale it to its brightest point.
-  renderer.readRenderTargetPixels(screenRT, 0, 0, g.H, g.H, readBack);
-  let max = 1e-9;
-  for (let i = 2; i < readBack.length; i += 4) max = Math.max(max, readBack[i]);
-  U.uMaxIntensity.value = max;
-  runPass(screenColorPass, screenColorRT);
-  job = null;
+  // Read back the screen's new rows, and redraw it scaled to the
+  // brightest point it now shows: the new rows, and the previous
+  // picture's in the rows still to come.
+  const rows = job.screenRow - screenStart;
+  if (rows > 0) {
+    renderer.readRenderTargetPixels(screenRT, 0, screenStart, S, rows, readBack);
+    for (let r = 0; r < rows; r++) {
+      let max = 0;
+      for (let i = r * S * 4 + 2; i < (r + 1) * S * 4; i += 4) max = Math.max(max, readBack[i]);
+      rowMax[screenStart + r] = max;
+    }
+    U.uMaxIntensity.value = Math.max(1e-9, ...rowMax);
+    runPass(screenColorPass, screenColorRT);
+  }
+  if (job.fieldRow >= g.H && job.screenRow >= S) job = null;
 }
 
 // ---- Drawing ----------------------------------------------------------------

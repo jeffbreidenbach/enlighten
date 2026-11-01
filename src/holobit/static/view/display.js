@@ -3,6 +3,7 @@
 
 import { float, HEAD, vec3 } from "../glsl.js";
 import { BEAM_FALLOFF, ROW_LENS, ROW_OPEN, ROW_WALL } from "../physics/aperture.js";
+import { SCREEN_STEP } from "../physics/wavefield.js";
 
 export const BG = [6, 8, 14];
 export const WALL = [120, 124, 136];
@@ -49,6 +50,7 @@ void main() {
 // source, and the screen seen edge-on in the strip on the right. It is
 // added on top of the 3D scene, so black means clear.
 export const SLICE_COLOR_SHADER = `${HEAD}
+const float STEP = ${float(SCREEN_STEP)};
 uniform sampler2D uField, uRows, uScreen;
 uniform vec2 uPhase, uBeamDir;
 uniform vec3 uHue;
@@ -111,8 +113,16 @@ void main() {
       rgb = uHue * shade * min(strength, 1.0) * beam(c);
     }
   } else if (c.x >= uWidth + 2.0 * uScale) {
-    // The screen strip: the center line of the screen plate.
-    float i = texelFetch(uScreen, ivec2(int(uCenterY), int(c.y)), 0).b;
+    // The screen strip: the center line of the screen plate, which is
+    // computed more coarsely, so blended between its nearest two rows.
+    float at = (c.y + 0.5) / STEP - 0.5;
+    int column = int(uCenterY / STEP);
+    int below = int(floor(at));
+    int top = int(textureSize(uScreen, 0).y) - 1;
+    float i = mix(
+      texelFetch(uScreen, ivec2(column, clamp(below, 0, top)), 0).b,
+      texelFetch(uScreen, ivec2(column, clamp(below + 1, 0, top)), 0).b,
+      fract(at));
     rgb = uHue * clamp(i / uMaxIntensity, 0.0, 1.0) * uStrip;
   }
   outColor = vec4(rgb, 1.0);

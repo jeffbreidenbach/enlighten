@@ -37,20 +37,19 @@ const SLITS = {
 // along the normal (the grating equation: period = wavelength / sin 45).
 const GRATING_PERIOD = wavelengthCells(DEFAULT_WAVELENGTH) * Math.SQRT2;
 
-// Round Fresnel lenses: their centers' heights and radius, in base cells.
-// A lens focuses a plane wave to a spot in line with its center, so the
-// single lens is centered at the plate's top edge, 40 cells above the
-// axis, and puts its spot 40 cells up the screen: its light visibly bends,
-// and can't be mistaken for light passing straight through. It is big
-// enough to cover the whole plate, which holds only an off-center piece of
-// it: a grating plus a lens, which is what an off-axis hologram of a point
-// is. The two lenses are that lens and its mirror image, both covering the
-// whole plate, which passes half of each.
+// Round Fresnel lenses: their centers' heights, in base cells. A lens
+// focuses a plane wave to a spot in line with its center, so the single
+// lens is centered 40 cells above the axis, at the default plate's top
+// edge, and puts its spot 40 cells up the screen: its light visibly bends,
+// and can't be mistaken for light passing straight through. Each lens is
+// just big enough to cover the whole plate, which holds only an off-center
+// piece of it: a grating plus a lens, which is what an off-axis hologram
+// of a point is. The two lenses are that lens and its mirror image, and
+// the plate passes half of each.
 const LENS_OFFSET = 40;
-const LENS_RADIUS = 80;
 const LENSES = {
-  lens: { centers: [LENS_OFFSET], radius: LENS_RADIUS },
-  lens2: { centers: [-LENS_OFFSET, LENS_OFFSET], radius: LENS_RADIUS },
+  lens: [LENS_OFFSET],
+  lens2: [-LENS_OFFSET, LENS_OFFSET],
 };
 
 // The beam has soft edges, like a laser's Gaussian profile: its strength
@@ -126,10 +125,10 @@ function arriving(g, y) {
 //
 // `lens` is the lens layout in grid cells, or null.
 export function aperture(params, g) {
-  const layout = LENSES[params.aperture];
-  const lens = layout && {
-    centers: layout.centers.map((c) => c * g.scale),
-    radius: layout.radius * g.scale,
+  const centers = LENSES[params.aperture];
+  const lens = centers && {
+    centers: centers.map((c) => c * g.scale),
+    radius: LENS_OFFSET * g.scale + g.apertureSize / 2,
   };
   const kind = new Uint8Array(g.H);
   const block = new Float32Array(g.H);

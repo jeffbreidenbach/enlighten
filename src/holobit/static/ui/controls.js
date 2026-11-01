@@ -1,16 +1,25 @@
 // The control panel: the controls on the left, then a short explanation
 // of whatever was just changed, then the tour's back and next buttons.
-// Changing the aperture, source distance, wavelength or incident angle calls
-// onChange, which recomputes the light; the view button switches
-// between the cross section and the full view.
+// Changing the aperture, plate size, source distance, wavelength or
+// incident angle calls onChange, which recomputes the light; the view
+// button switches between the cross section and the full view.
 
 import { APERTURES } from "../physics/aperture.js";
-import { DEFAULT_WAVELENGTH, FARTHEST, sourceMicrons } from "../physics/layout.js";
+import {
+  DEFAULT_PLATE,
+  DEFAULT_WAVELENGTH,
+  FARTHEST,
+  MAX_PLATE,
+  microns,
+  MIN_PLATE,
+  sourceMicrons,
+} from "../physics/layout.js";
 import { EXPLANATIONS } from "./explanations.js";
 import { TOUR } from "./tour.js";
 
 const DEFAULTS = {
   aperture: "single",
+  plate: DEFAULT_PLATE,
   distance: 0,
   wavelength: DEFAULT_WAVELENGTH,
   angle: 0,
@@ -19,10 +28,11 @@ const DEFAULTS = {
 
 // When a tour step moves a slider, it sweeps there instead of jumping:
 // one step every SWEEP_STEP_MS, of this size for each slider. Across the
-// whole spectrum takes about a second and a half; 0 to 45 degrees, under
-// a second; the source out to infinity, a second.
+// whole spectrum takes about a second and a half; 0 to 45 degrees, about
+// a second and a half; the source out to infinity, a second; the plate from its
+// default to its largest, half a second.
 const SWEEP_STEP_MS = 50;
-const SWEEP_SIZES = { wavelength: 10, angle: 3, distance: 5 };
+const SWEEP_SIZES = { wavelength: 10, angle: 1.5, distance: 5, plate: 8 };
 
 // The full settings at each tour step: each step's changes on top of the
 // ones before it, so stepping back restores everything.
@@ -75,6 +85,14 @@ export function createControls(panel, { onChange }) {
     sliders[key] = { input, out, format, row: r };
   };
 
+  // How tall (and wide) the aperture plate is, which is also how wide the
+  // beam is.
+  slider("Plate size", "plate", {
+    min: MIN_PLATE,
+    max: MAX_PLATE,
+    step: 8,
+    format: (v) => `${Math.round(microns(v))} µm`,
+  });
   // How far away the point source is, from nearest to infinitely far,
   // where it becomes a plane wave.
   slider("Source distance", "distance", {
@@ -91,7 +109,8 @@ export function createControls(panel, { onChange }) {
     min: -60,
     max: 60,
     step: 1,
-    format: (v) => `${v > 0 ? "+" : ""}${v}°`,
+    // Whole degrees, even part way through a tour sweep.
+    format: (v) => `${v > 0 ? "+" : ""}${Math.round(v)}°`,
   });
 
   const buttons = document.createElement("div");
