@@ -4,6 +4,8 @@
 // stereograms: diffraction, interference, gratings, a lens as the hologram
 // of a point, superposition, reference beams and viewpoints.
 
+import { FARTHEST } from "../physics/layout.js";
+
 export const EXPLANATIONS = {
   // Apertures.
   single:
@@ -19,38 +21,38 @@ export const EXPLANATIONS = {
     "exactly what two interfering plane waves record on film, so this is the simplest possible " +
     "hologram. Lit by a plane wave, it splits the light into just a few beams, called orders: " +
     "tilt the beam to 45 degrees and its first order comes straight out.",
-  // Where the off-center lens sends the light depends on the light.
+  // Where the off-center lens sends the light depends on the source.
   lens: (params) =>
     "A Fresnel lens is a flattened lens: rings that delay the light just enough to bend every part " +
     "of the wave toward one point. This one is off center. " +
-    (params.light === "point"
-      ? "Lit by the point source, it both steers and focuses, sending the light up to a spot high " +
-        "on the screen. "
-      : "A straight-on plane wave focuses along the lens's own axis, to a spot just above the " +
-        "screen's center. ") +
+    (params.distance === FARTHEST
+      ? "Lit by the plane wave, it both steers and focuses, sending the light to a spot on the " +
+        "screen in line with the lens's center. "
+      : "It was built for a plane wave, so light from a nearer source focuses beyond the screen " +
+        "and arrives still spread out. ") +
     "A lens like this is the hologram of a single point.",
   lens2:
     "Two lenses overlaid on one plate focus light to two separate points at once. A hologram works " +
     "the same way: it is the sum of the 'lenses' for every point of an object, all on one plate. A " +
     "holographic stereogram goes one step further, stitching together many such views.",
 
-  // Light.
-  point:
-    "A point source sends out spherical waves, the simplest light anything can give off. Every " +
-    "point on a real object scatters light like this, so an object's light is the sum of countless " +
-    "point sources.",
-  plane:
-    "A plane wave has flat wavefronts all travelling one way, like a laser beam. Holograms are " +
-    "recorded and replayed with a beam like this, called the reference beam.",
-
   // Sliders.
+  distance: (params) =>
+    params.distance === FARTHEST
+      ? "Infinitely far away, the source's wavefronts are flat: a plane wave, all travelling one " +
+        "way, like a laser beam. Holograms are recorded and replayed with a beam like this, called " +
+        "the reference beam."
+      : "A point source sends out spherical waves, like the light from every point of a real " +
+        "object. The farther away it is, the flatter its wavefronts when they arrive; at infinity " +
+        "they are a plane wave. A lens, built for one distance, focuses a nearer source beyond " +
+        "the screen, like a camera out of focus.",
   wavelength:
     "Wavelength sets the color. Longer, redder waves bend more at the same slits or grating, so " +
     "their patterns spread wider; shorter, bluer waves spread less. That is why a hologram lit by " +
     "white light shimmers with color.",
-  // The same angle for either light; what it shows depends on which.
+  // The same angle however far the source; what it shows depends on that.
   angle: (params) =>
-    params.light === "point"
+    params.distance !== FARTHEST
       ? "Moving the source moves where its light comes from. The fringes slide, and a lens's spot " +
         "moves to the opposite side: an upside-down image of the source. Every point of an object " +
         "lands in its own place this way."

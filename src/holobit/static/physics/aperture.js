@@ -38,15 +38,19 @@ const SLITS = {
 const GRATING_PERIOD = wavelengthCells(DEFAULT_WAVELENGTH) * Math.SQRT2;
 
 // Round Fresnel lenses: their centers' heights and radius, in base cells.
-// The single lens sits 15 cells above the axis, so it images the on-axis
-// source to a spot about 105 cells up the screen: its light visibly bends,
-// and can't be mistaken for light passing straight through. An off-center
-// piece of a lens like this is a grating plus a lens, which is what an
-// off-axis hologram of a point is. The two lenses overlap; where they do,
-// the plate passes half of each.
+// A lens focuses a plane wave to a spot in line with its center, so the
+// single lens is centered at the plate's top edge, 40 cells above the
+// axis, and puts its spot 40 cells up the screen: its light visibly bends,
+// and can't be mistaken for light passing straight through. It is big
+// enough to cover the whole plate, which holds only an off-center piece of
+// it: a grating plus a lens, which is what an off-axis hologram of a point
+// is. The two lenses are that lens and its mirror image, both covering the
+// whole plate, which passes half of each.
+const LENS_OFFSET = 40;
+const LENS_RADIUS = 80;
 const LENSES = {
-  lens: { centers: [15], radius: 25 },
-  lens2: { centers: [-10, 10], radius: 28 },
+  lens: { centers: [LENS_OFFSET], radius: LENS_RADIUS },
+  lens2: { centers: [-LENS_OFFSET, LENS_OFFSET], radius: LENS_RADIUS },
 };
 
 // The beam has soft edges, like a laser's Gaussian profile: its strength
@@ -72,17 +76,15 @@ export const MODE_SLITS = 0;
 export const MODE_LENS = 1;
 
 // The phase delay a perfect lens adds at distance rho from its center, so
-// that light arriving along its own axis all reaches the focus in step:
-// the path from the source (none for a plane wave, which comes from
-// infinitely far away) plus the path to the focus, compared with the path
-// straight through the center. The lens focuses on the screen. It is
-// fixed, so tilting the light moves the focus rather than changing the
-// lens.
+// that a plane wave arriving straight on all reaches the focus in step:
+// the path to the focus, compared with the path straight through the
+// center. The lens focuses on the screen, on its own axis. It is fixed,
+// like a real lens: moving the source moves the focus rather than
+// changing the lens, so a nearer source focuses beyond the screen, as a
+// camera does out of focus.
 function lensDelay(g, rho) {
-  const toSource = g.sourceDistance;
   const toFocus = g.screenX - g.apertureX;
-  const fromSource = g.planeWave ? 0 : Math.hypot(rho, toSource) - toSource;
-  return g.k * (fromSource + Math.hypot(rho, toFocus) - toFocus);
+  return g.k * (Math.hypot(rho, toFocus) - toFocus);
 }
 
 // A Fresnel lens wraps that delay every full wavelength, which is what
@@ -90,6 +92,16 @@ function lensDelay(g, rho) {
 // for drawing.
 export function lensGroove(g, rho) {
   return (lensDelay(g, rho) / (2 * Math.PI)) % 1;
+}
+
+// The light arriving at height y on the plate, the same as incident() in
+// wavefield.js: its strength, how much farther it has come than to the
+// plate's center, and its curvature there.
+function arriving(g, y) {
+  const c = g.curvature;
+  const along = y * g.beamDir[1];
+  const m = Math.sqrt(1 + 2 * c * along + c * c * y * y);
+  return { amplitude: 1 / m, delay: (2 * along + c * y * y) / (1 + m), curvature: c / m };
 }
 
 // Describes the aperture for the current settings.
@@ -101,15 +113,16 @@ export function lensGroove(g, rho) {
 // - groove: for lens rows, how far through a groove the row sits.
 //
 // For the sums, `wavelets` holds four floats per wavelet:
-// - slits: [row height, re, im, distance from the point source]. Each
+// - slits: [row height, re, im, curvature of the light arriving there].
+//   Each
 //   open row is a full-width strip; the sum along its length is done in
 //   closed form (a standard stationary-phase result), leaving one term
 //   per row. re and im include the light arriving from the source.
 // - lenses: [ring radius, re, im, lens center height]. The shader
 //   averages each ring over points around it, working out the light
 //   arriving at each, since an off-center source lights a ring unevenly.
-// Light is scaled so the incoming wave has strength 1 where it meets the
-// plate on the axis; a plane wave has strength 1 everywhere.
+// Light is scaled so the incoming wave has strength 1 and phase 0 at the
+// plate's center.
 //
 // `lens` is the lens layout in grid cells, or null.
 export function aperture(params, g) {
@@ -151,17 +164,11 @@ export function aperture(params, g) {
     block[row] = 1 - pass;
 
     // Summing along the strip gives strength sqrt(k / 2 pi) and a 45
-    // degree lag. A plane wave then arrives with only its tilt's phase; a
-    // point source's light has travelled R to get here, which sets its
-    // phase, and 1 / sqrt(R) is what remains of its fall-off.
+    // degree lag, on top of the light arriving here. The shader needs the
+    // arriving light's curvature, 1 / its distance from the source.
     const strength = Math.sqrt(g.k / (2 * Math.PI)) * pass * beamProfile(g, y);
-    if (g.planeWave) {
-      list.push([y, strength, g.k * g.beamDir[1] * y - Math.PI / 4, 0]);
-    } else {
-      const R = Math.hypot(g.apertureX - g.sourceX, y - g.sourceY);
-      const scaled = (strength * g.sourceDistance) / Math.sqrt(R);
-      list.push([y, scaled, g.k * R - Math.PI / 4, R]);
-    }
+    const { amplitude, delay, curvature } = arriving(g, y);
+    list.push([y, strength * amplitude, g.k * delay - Math.PI / 4, curvature]);
   }
 
   for (const center of lens?.centers ?? []) {

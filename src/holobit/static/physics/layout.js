@@ -24,16 +24,31 @@ export const DEFAULT_WAVELENGTH = 550;
 // The aperture plate is this tall (and wide), in base cells: about a
 // quarter of the screen.
 const APERTURE_SIZE = 80;
-// The aperture plate is 96 base cells in. At an incident angle of 0 the
-// point source sits at the left edge, just far enough in for its dot to
-// show; at other angles it moves along an arc, staying the same distance
-// from the plate's center.
+// The aperture plate is 96 base cells in. At its nearest, and an incident
+// angle of 0, the point source sits at the left edge, just far enough in
+// for its dot to show; at other angles it moves along an arc, staying the
+// same distance from the plate's center.
 const APERTURE_X = 96;
-const SOURCE_DISTANCE = 93;
+const NEAREST_SOURCE = 93;
 
 // A wavelength's length in base cells.
 export function wavelengthCells(nm) {
   return nm * CELLS_PER_NM;
+}
+
+// The source distance slider runs from 0, the nearest, to 100, infinitely
+// far. Like a camera's focus ring it is even in curvature, 1 / distance,
+// which falls from 1 / NEAREST_SOURCE to 0: the wavefronts flatten
+// steadily, and the far end is a plane wave.
+export const FARTHEST = 100;
+
+function curvature(distance) {
+  return (1 - distance / FARTHEST) / NEAREST_SOURCE;
+}
+
+// The source's distance from the plate, in micrometres, or Infinity.
+export function sourceMicrons(distance) {
+  return 1 / curvature(distance) / CELLS_PER_NM / 1000;
 }
 
 // Everything the calculation and the drawing need to know about the
@@ -47,6 +62,10 @@ export function geometry(params) {
   // center of the aperture plate, for either light. Positive comes from
   // above.
   const angle = (params.angle * Math.PI) / 180;
+  // The source's distance from the plate's center, in base cells; 0 for a
+  // plane wave, where there is no source to place.
+  const c = curvature(params.distance);
+  const toSource = c > 0 ? 1 / c : 0;
   return {
     scale,
     // The cross section, and the strip on its right where the screen is
@@ -56,13 +75,13 @@ export function geometry(params) {
     stripW,
     centerY: H / 2,
 
-    // The light: a point source, at sourceY above the axis and
-    // sourceDistance from the plate's center; or a plane wave travelling
-    // along beamDir.
-    planeWave: params.light === "plane",
-    sourceX: (APERTURE_X - SOURCE_DISTANCE * Math.cos(angle)) * scale,
-    sourceY: SOURCE_DISTANCE * Math.sin(angle) * scale,
-    sourceDistance: SOURCE_DISTANCE * scale,
+    // The light: a point source, 1 / curvature from the plate's center,
+    // at (sourceX, sourceY), its light arriving there travelling along
+    // beamDir. A curvature of 0 is a plane wave travelling along beamDir,
+    // and has no source.
+    curvature: c / scale,
+    sourceX: (APERTURE_X - toSource * Math.cos(angle)) * scale,
+    sourceY: toSource * Math.sin(angle) * scale,
     beamDir: [Math.cos(angle), -Math.sin(angle)],
     // The wavenumber: 2 pi over the wavelength.
     k: (2 * Math.PI) / (wavelengthCells(params.wavelength) * scale),

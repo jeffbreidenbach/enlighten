@@ -8,9 +8,10 @@
 // FIELD_SHADER fills the cross section; SCREEN_SHADER fills the face of
 // the screen plate. Both take these uniforms:
 //   uK             wavenumber, 2 pi / wavelength
-//   uPlaneWave     1 for a plane wave travelling along uBeamDir, 0 for
-//                  the point source at (uSourceX, uSourceY), which is
-//                  uSourceDistance from the plate's center
+//   uCurvature, uBeamDir
+//                  the light: a point source 1 / uCurvature from the
+//                  plate's center, its light arriving there along
+//                  uBeamDir; or, at curvature 0, a plane wave
 //   uApertureX, uWallHalf, uApertureHalf, uCenterY
 //                  the plate's column, half its thickness, half its
 //                  height, and the axis's row
@@ -25,8 +26,8 @@ import { BEAM_FALLOFF, MODE_LENS, ROW_LENS, ROW_OPEN } from "./aperture.js";
 // The light at a point x along the axis and p across it, where p.y is the
 // height above the axis and p.x the distance out of the cross section.
 const WAVEFIELD = `
-uniform float uK, uSourceX, uSourceY, uSourceDistance, uApertureX, uWallHalf, uApertureHalf, uCenterY;
-uniform int uPlaneWave, uMode, uWaveletCount;
+uniform float uK, uCurvature, uApertureX, uWallHalf, uApertureHalf, uCenterY;
+uniform int uMode, uWaveletCount;
 uniform vec2 uBeamDir;
 uniform sampler2D uRows, uWavelets;
 
@@ -49,14 +50,18 @@ vec2 wavelet(float r, float dx) {
   return 0.5 * (1.0 + dx / r) / r * wave(r);
 }
 
-// The light arriving from the source. The plane wave has strength 1 and
-// phase 0 where it crosses the plate's center. The point source's
-// spherical wave fades as 1/distance, scaled to strength 1 at the plate's
-// center.
+// The light arriving from the source, with strength 1 and phase 0 at the
+// plate's center. With the source D = 1 / uCurvature away, a point q from
+// the plate's center is d = D m away, where m is below; the spherical
+// wave fades as D / d = 1 / m, and its phase is set by d - D. That is
+// rearranged so it never works with D itself: at curvature 0 it becomes
+// the plane wave, phase set by how far along uBeamDir q is.
 vec2 incident(float x, vec2 p) {
-  if (uPlaneWave == 1) return wave(dot(uBeamDir, vec2(x - uApertureX, p.y)));
-  float d = length(vec3(x - uSourceX, p.x, p.y - uSourceY));
-  return uSourceDistance / max(d, 0.5) * wave(d);
+  vec3 q = vec3(x - uApertureX, p.x, p.y);
+  float along = dot(vec3(uBeamDir.x, 0.0, uBeamDir.y), q);
+  float c = uCurvature;
+  float m = sqrt(max(1.0 + 2.0 * c * along + c * c * dot(q, q), 0.0));
+  return wave((2.0 * along + c * dot(q, q)) / (1.0 + m)) / max(m, 0.5 * c);
 }
 
 // The beam's soft edge (BEAM_FALLOFF in aperture.js), at point q of the
@@ -65,33 +70,31 @@ float beamProfile(vec2 q) {
   return exp(-${float(BEAM_FALLOFF)} * dot(q, q) / (uApertureHalf * uApertureHalf));
 }
 
-// A full-width slit row at height rowY, whose light came distance R from
-// the point source. Summing its wavelets along the row (in closed form)
-// leaves one wavelet whose strength fades as 1/sqrt(r (R + r)) for a
-// point source, or 1/sqrt(r) for a plane wave.
+// A full-width slit row at height rowY, where the arriving light has
+// curvature 1 / R, R its distance from the source. Summing its wavelets
+// along the row (in closed form) leaves one wavelet whose strength fades
+// as 1/sqrt(r (R + r)), scaled to 1/sqrt(r) for a plane wave.
 vec2 slitRow(vec4 w, float dx, vec2 p) {
   float rowY = w.x;
-  float R = w.w;
   float r = length(vec2(dx, p.y - rowY));
-  float spread = uPlaneWave == 1 ? sqrt(r) : sqrt(r / (R + r));
+  float spread = sqrt(r / (1.0 + w.w * r));
   return spread * cmul(w.yz, wavelet(r, dx));
 }
 
 // A ring of radius rho of a lens centered at height centerY, summed by
 // averaging over points around it. At angle phi a point of the ring sits
 // rho cos(phi) out of the cross section and rho sin(phi) above the lens's
-// center. pc and sc are the point and the source's height measured from
-// that center.
+// center. pc is the point measured from that center.
 vec2 lensRing(vec4 w, float dx, vec2 p) {
   float rho = w.x;
   float centerY = w.w;
   vec2 pc = p - vec2(0.0, centerY);
-  float sc = uSourceY - centerY;
   float toP2 = dx * dx + dot(pc, pc) + rho * rho;
-  float toSource2 = pow(uApertureX - uSourceX, 2.0) + sc * sc + rho * rho;
   // The phase swings by about this much around the ring, so that many
-  // points, plus a margin, are enough for an accurate average.
-  float tilt = uPlaneWave == 1 ? abs(uBeamDir.y) : abs(sc) / sqrt(toSource2);
+  // points, plus a margin, are enough for an accurate average. The
+  // arriving light's tilt across the ring is at most its tilt at the
+  // plate's center plus what its curvature adds.
+  float tilt = min(abs(uBeamDir.y) + uCurvature * (abs(centerY) + rho), 1.0);
   float swing = uK * rho * (length(pc) / sqrt(toP2) + tilt);
   int n = min(int(swing) + 8, 256);
   vec2 sum = vec2(0.0);

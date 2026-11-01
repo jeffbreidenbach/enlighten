@@ -30,22 +30,39 @@ export const TOUR = [
       "this way, which is why one lit by white light shimmers like a rainbow.",
   },
   {
-    set: { wavelength: 550, angle: 12 },
+    set: { angle: 12 },
     text:
-      "Back to green, and now move the source up. The fringes slide down: they record where the " +
-      "light came from. Recording that information is the whole idea of a hologram.",
+      "Now move the source up. The fringes slide down: they record where the light came from. " +
+      "Recording that information is the whole idea of a hologram.",
   },
   {
-    set: { angle: 0, view: "full" },
+    set: { wavelength: 550 },
+    text:
+      "Back to green. The fringes close up again, but stay shifted: color and direction are " +
+      "recorded together.",
+  },
+  {
+    set: { angle: 0 },
+    text: "Bring the source back to the middle, and the fringes slide back with it.",
+  },
+  {
+    set: { view: "full" },
     text:
       "Step back to see the whole setup: the light source, the plate with the slits, and the " +
       "screen. A piece of film where the screen is would record those fringes.",
   },
   {
-    set: { view: "cross", light: "plane" },
+    set: { distance: 100 },
     text:
-      "Now the light is a plane wave, with flat wavefronts all moving one way, like a laser beam. " +
-      "Holograms are recorded and replayed with light like this, called the reference beam.",
+      "Now move the source farther and farther away. Its waves arrive at the plate flatter and " +
+      "flatter, and the beam narrows from a wedge to a straight band.",
+  },
+  {
+    set: { view: "cross" },
+    text:
+      "Infinitely far away, the source's wavefronts are flat: a plane wave, all moving one way, " +
+      "like a laser beam. Holograms are recorded and replayed with light like this, called the " +
+      "reference beam.",
   },
   {
     set: { aperture: "grating" },
@@ -62,12 +79,18 @@ export const TOUR = [
       "to off-axis holography.",
   },
   {
-    set: { aperture: "lens", light: "point", angle: 0 },
+    set: { angle: 0 },
+    text:
+      "Straighten the beam again, and the orders spread out evenly on either side of the light " +
+      "going straight through.",
+  },
+  {
+    set: { aperture: "lens" },
     text:
       "A Fresnel lens is rings of fringes that bend every part of the wave toward one spot. This " +
-      "one is off center, so it acts like a grating and a lens at once, steering the light up to a " +
-      "spot high on the screen. It is the hologram of a single point: light it, and it recreates " +
-      "that point.",
+      "one is off center, so it acts like a grating and a lens at once, steering the plane wave up " +
+      "to a bright spot on the screen. It is the hologram of a single point: light it, and it " +
+      "recreates that point.",
   },
   {
     set: { view: "full" },

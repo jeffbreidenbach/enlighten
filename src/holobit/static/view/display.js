@@ -52,25 +52,25 @@ export const SLICE_COLOR_SHADER = `${HEAD}
 uniform sampler2D uField, uRows, uScreen;
 uniform vec2 uPhase, uBeamDir;
 uniform vec3 uHue;
-uniform float uMaxIntensity, uWidth, uScale, uSourceX, uSourceY, uCenterY;
+uniform float uMaxIntensity, uWidth, uScale, uSourceX, uSourceY, uCurvature, uCenterY;
 uniform float uApertureX, uWallHalf, uApertureHalf;
-uniform int uPlaneWave;
 // How much of the screen strip shows: 1 in the cross section, fading to 0
 // in the full view, where the screen plate itself stands there.
 uniform float uStrip;
 out vec4 outColor;
 
 // The light before the plate is drawn as a beam aimed at it: it shows only
-// where it is headed for the plate. For the point source that is the
-// wedge from the source to the plate's top and bottom edges; for the plane
-// wave, the band of parallel rays that hit it. The beam is soft-edged, as
+// where it is headed for the plate. For a point source that is the wedge
+// from the source to the plate's top and bottom edges, narrowing as the
+// source moves away; for a plane wave, the band of parallel rays that hit
+// it. The beam is soft-edged, as
 // in the sums.
 float beam(vec2 c) {
   if (c.x >= uApertureX - uWallHalf) return 1.0;
   // Where the ray through c meets the plate, and how much closer together
   // rays are at c than at the plate.
   float hit, squeeze;
-  if (uPlaneWave == 1) {
+  if (uCurvature == 0.0) {
     hit = c.y + uBeamDir.y / uBeamDir.x * (uApertureX - c.x);
     squeeze = 1.0;
   } else {
@@ -99,7 +99,7 @@ void main() {
       rgb = kind == ${float(ROW_WALL)} ? ${vec3(WALL)}
           : partial ? ${vec3(WALL)} * row.y
           : ${vec3(GLASS)} * (0.45 + 0.55 * row.z);
-    } else if (uPlaneWave == 0 && distance(c, vec2(uSourceX, uCenterY + uSourceY)) <= 3.0 * uScale) {
+    } else if (uCurvature > 0.0 && distance(c, vec2(uSourceX, uCenterY + uSourceY)) <= 3.0 * uScale) {
       rgb = vec3(1.0);
     } else {
       // Each wave is a smooth cosine at this moment's phase: brightest at

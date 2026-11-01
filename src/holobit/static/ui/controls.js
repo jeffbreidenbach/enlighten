@@ -1,17 +1,17 @@
 // The control panel: the controls on the left, then a short explanation
 // of whatever was just changed, then the tour's back and next buttons.
-// Changing the aperture, light, wavelength or incident angle calls
+// Changing the aperture, source distance, wavelength or incident angle calls
 // onChange, which recomputes the light; the view button switches
 // between the cross section and the full view.
 
 import { APERTURES } from "../physics/aperture.js";
-import { DEFAULT_WAVELENGTH } from "../physics/layout.js";
+import { DEFAULT_WAVELENGTH, FARTHEST, sourceMicrons } from "../physics/layout.js";
 import { EXPLANATIONS } from "./explanations.js";
 import { TOUR } from "./tour.js";
 
 const DEFAULTS = {
   aperture: "single",
-  light: "point",
+  distance: 0,
   wavelength: DEFAULT_WAVELENGTH,
   angle: 0,
   view: "cross",
@@ -20,9 +20,9 @@ const DEFAULTS = {
 // When a tour step moves a slider, it sweeps there instead of jumping:
 // one step every SWEEP_STEP_MS, of this size for each slider. Across the
 // whole spectrum takes about a second and a half; 0 to 45 degrees, under
-// a second.
+// a second; the source out to infinity, a second.
 const SWEEP_STEP_MS = 50;
-const SWEEP_SIZES = { wavelength: 10, angle: 3 };
+const SWEEP_SIZES = { wavelength: 10, angle: 3, distance: 5 };
 
 // The full settings at each tour step: each step's changes on top of the
 // ones before it, so stepping back restores everything.
@@ -59,17 +59,6 @@ export function createControls(panel, { onChange }) {
   });
   apRow.append(apSelect);
 
-  const lightRow = row(group, "Light");
-  const lightSelect = document.createElement("select");
-  lightSelect.add(new Option("Point source", "point"));
-  lightSelect.add(new Option("Plane wave", "plane"));
-  lightSelect.addEventListener("change", () => {
-    params.light = lightSelect.value;
-    explain(params.light);
-    onChange();
-  });
-  lightRow.append(lightSelect);
-
   // Each slider and its readout, so sync() can set them.
   const sliders = {};
   const slider = (label, key, { min, max, step, format }) => {
@@ -86,9 +75,17 @@ export function createControls(panel, { onChange }) {
     sliders[key] = { input, out, format, row: r };
   };
 
+  // How far away the point source is, from nearest to infinitely far,
+  // where it becomes a plane wave.
+  slider("Source distance", "distance", {
+    min: 0,
+    max: FARTHEST,
+    step: 1,
+    format: (v) => (v === FARTHEST ? "∞" : `${Math.round(sourceMicrons(v))} µm`),
+  });
   slider("Wavelength", "wavelength", { min: 400, max: 700, step: 10, format: (v) => `${v} nm` });
   // The direction the light arrives from at the center of the aperture
-  // plate, in degrees from the axis, for either light. Positive comes from
+  // plate, in degrees from the axis, however far the source. Positive comes from
   // above.
   slider("Incident angle", "angle", {
     min: -60,
@@ -111,7 +108,6 @@ export function createControls(panel, { onChange }) {
   // Makes every control show what params holds.
   function sync() {
     apSelect.value = params.aperture;
-    lightSelect.value = params.light;
     for (const [key, s] of Object.entries(sliders)) {
       s.input.value = params[key];
       s.out.value = s.format(params[key]);
@@ -137,20 +133,18 @@ export function createControls(panel, { onChange }) {
 
   let step = 0;
   // Shows tour step i. Sliders the step moves sweep through the values in
-  // between instead of jumping, so the rainbow or the tilt plays out,
-  // except in a step that also changes the aperture or the light: there
-  // everything changes at once. The first call, while the page is
-  // starting, only sets the controls: the light is computed once
-  // everything is ready.
+  // between instead of jumping, so the rainbow or the tilt plays out; a
+  // new aperture appears at once, and its sliders sweep from there. The
+  // first call, while the page is starting, only sets the controls: the
+  // light is computed once everything is ready.
   function goTo(i, { initial = false } = {}) {
     clearInterval(sweep);
     step = i;
     const from = { ...params };
     Object.assign(params, TOUR_STATES[step]);
     const targets = {};
-    const jump = initial || params.aperture !== from.aperture || params.light !== from.light;
     for (const key of Object.keys(SWEEP_SIZES)) {
-      if (jump || params[key] === from[key]) continue;
+      if (initial || params[key] === from[key]) continue;
       targets[key] = params[key];
       params[key] = from[key];
     }

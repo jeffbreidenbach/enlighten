@@ -96,11 +96,10 @@ const rowsTex = dataTexture(rowsData);
 // Uniforms shared by every pass, so one update reaches all of them.
 const U = {
   uK: { value: 0 },
-  uPlaneWave: { value: 0 },
+  uCurvature: { value: 0 },
   uBeamDir: { value: new THREE.Vector2() },
   uSourceX: { value: 0 },
   uSourceY: { value: 0 },
-  uSourceDistance: { value: g.sourceDistance },
   uApertureX: { value: g.apertureX },
   uWallHalf: { value: g.wallHalf },
   uApertureHalf: { value: g.apertureSize / 2 },
@@ -178,7 +177,7 @@ function startCompute() {
   U.uWaveletCount.value = ap.count;
   U.uMode.value = ap.mode;
   U.uK.value = g.k;
-  U.uPlaneWave.value = g.planeWave ? 1 : 0;
+  U.uCurvature.value = g.curvature;
   U.uBeamDir.value.set(...g.beamDir);
   U.uSourceX.value = g.sourceX;
   U.uSourceY.value = g.sourceY;
