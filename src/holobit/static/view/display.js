@@ -11,20 +11,20 @@ export const GLASS = [150, 190, 220];
 // Virtual light, which only seems to be there, is drawn in white, fading
 // slowly in and out (see ghost()).
 const VIRTUAL = [235, 235, 235];
-const GHOST_SECONDS = 6;
+// How long, in seconds, virtual light stays at full brightness, and how
+// long it takes to fade out, stay dark and fade back in.
+const GHOST_HOLD = 5;
+const GHOST_FADE = 4;
 
-// How bright virtual light is drawn at time t, in seconds: rising from
-// black to full brightness and back every GHOST_SECONDS, lingering in
-// the dark.
+// How bright virtual light, and the eye that sees it, are drawn at time
+// t, in seconds: at full brightness for GHOST_HOLD, so it can be seen
+// clearly, then over GHOST_FADE fading out, lingering in the dark and
+// fading back in, along the dimmer two thirds of a squared sine.
 export function ghost(t) {
-  return (0.5 + 0.5 * Math.sin((2 * Math.PI * t) / GHOST_SECONDS)) ** 2;
-}
-
-// The eye fades with the virtual light, but stays fully drawn for the
-// third of each cycle the light is brightest, two seconds, so it can be
-// seen clearly.
-export function eyeFade(t) {
-  return Math.min(1, ghost(t) / 0.75 ** 2);
+  const u = t % (GHOST_HOLD + GHOST_FADE);
+  if (u < GHOST_HOLD) return 1;
+  const x = (5 * Math.PI) / 6 + ((u - GHOST_HOLD) / GHOST_FADE) * ((4 * Math.PI) / 3);
+  return Math.min(1, ((0.5 + 0.5 * Math.sin(x)) / 0.75) ** 2);
 }
 
 // With the beam reversed, an eye looks through the plate toward the
@@ -33,7 +33,7 @@ export function eyeFade(t) {
 // stands EYE_BACK base cells in front of the plate, its eyeball
 // EYE_RADIUS across, its lens LENS of that ahead of its middle, and its
 // retina at the back.
-const EYE_BACK = 46;
+const EYE_BACK = 210;
 const EYE_RADIUS = 24;
 const LENS = 0.6;
 // How far in from the back of the eyeball the retina is drawn, in base
@@ -144,10 +144,10 @@ uniform float uBeamGap;
 uniform float uStrip;
 // Whether the beam is reversed, coming from the screen's side: the light
 // is computed mirrored, so the source and beam are placed mirrored too,
-// and a hologram's virtual light is drawn over it in white, uGhost as
-// bright as it can be, and the eye uEyeFade as clearly drawn.
+// and a hologram's virtual light and the eye that sees it are drawn over
+// it in white, uGhost as bright as they can be.
 uniform bool uReversed;
-uniform float uGhost, uEyeFade;
+uniform float uGhost;
 out vec4 outColor;
 
 // A wave as drawn: a smooth cosine at this moment's phase, brightest at
@@ -277,8 +277,8 @@ void main() {
     }
     if (uReversed) {
       vec2 e = eye(c);
-      rgb = mix(rgb, ${vec3(VIRTUAL)} * e.x, e.y * uEyeFade);
-      rgb = max(rgb, uHue * retina(c) * uEyeFade);
+      rgb = mix(rgb, ${vec3(VIRTUAL)} * e.x, e.y * uGhost);
+      rgb = max(rgb, uHue * retina(c) * uGhost);
     }
   } else {
     // The screen strip, from the screen on: the center line of the screen

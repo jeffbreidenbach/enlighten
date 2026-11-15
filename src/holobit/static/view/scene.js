@@ -160,14 +160,66 @@ export function createScene(g, sliceTexture, screenTexture, retinaTexture) {
     retina.scale.y = retinaSize;
   }
 
+  // The corners of what the full view must show: the cross section, and
+  // the screen plate (the aperture plate is smaller, and within them).
+  const halfW = (totalW * UNIT) / 2;
+  const halfH = (g.H * UNIT) / 2;
+  const screenX = (g.screenX - totalW / 2) * UNIT;
+  const corners = [];
+  for (const y of [-halfH, halfH]) {
+    for (const x of [-halfW, halfW]) corners.push(new THREE.Vector3(x, y, 0));
+    for (const z of [-halfH, halfH]) corners.push(new THREE.Vector3(screenX, y, z));
+  }
+
+  // The full view's camera: looking along -OBLIQUE_DIR from as close as
+  // fits the whole scene in the window above its bottom `covered` share,
+  // where the controls float, with a small margin, and slid sideways and
+  // up or down so the scene sits in the middle of that room. Returns the
+  // point it looks at, and its distance from it.
+  function fitOblique(covered) {
+    const tan = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    const dir = OBLIQUE_DIR;
+    const right = new THREE.Vector3(0, 1, 0).cross(dir).normalize();
+    const up = new THREE.Vector3().crossVectors(dir, right);
+    // Each corner across, up, and toward the camera.
+    const pts = corners.map((c) => [c.dot(right), c.dot(up), c.dot(dir)]);
+    const margin = 0.1;
+    const [xHi, yLo, yHi] = [1 - margin, -1 + 2 * covered + margin, 1 - margin];
+    // At distance d, the ranges the camera's slide may take across and up
+    // so every corner shows; empty if it is too close.
+    const ranges = (d) => {
+      let [x0, x1, y0, y1] = [-Infinity, Infinity, -Infinity, Infinity];
+      for (const [a, b, z] of pts) {
+        const h = (d - z) * tan;
+        const w = h * camera.aspect;
+        [x0, x1] = [Math.max(x0, a - xHi * w), Math.min(x1, a + xHi * w)];
+        [y0, y1] = [Math.max(y0, b - yHi * h), Math.min(y1, b - yLo * h)];
+      }
+      return [x0, x1, y0, y1];
+    };
+    const fits = (d) => {
+      const [x0, x1, y0, y1] = ranges(d);
+      return x0 <= x1 && y0 <= y1;
+    };
+    let [lo, hi] = [halfH, 4 * halfW + 4 * halfH];
+    while (!fits(hi)) hi *= 2;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) hi = mid;
+      else lo = mid;
+    }
+    const [x0, x1, y0, y1] = ranges(hi);
+    const target = right.multiplyScalar((x0 + x1) / 2).add(up.multiplyScalar((y0 + y1) / 2));
+    return { target, dist: hi };
+  }
+
   // Places the camera and plates part way between the cross section
-  // (t = 0) and the full view (t = 1), eased. Returns the eased amount.
-  function layout(t) {
+  // (t = 0) and the full view (t = 1), eased, with the controls covering
+  // the bottom `covered` share of the window. Returns the eased amount.
+  function layout(t, covered) {
     const e = t * t * (3 - 2 * t);
     const aspect = camera.aspect;
     const half = THREE.MathUtils.degToRad(FOV / 2);
-    const halfW = (totalW * UNIT) / 2;
-    const halfH = (g.H * UNIT) / 2;
     const flatDist = Math.max(halfH, halfW / aspect) / Math.tan(half);
     // In the cross section the picture is pinned to the top-left corner,
     // so any spare room collects at the bottom (where the controls float)
@@ -177,15 +229,14 @@ export function createScene(g, sliceTexture, screenTexture, retinaTexture) {
       Math.max(0, viewHalfH * aspect - halfW),
       -Math.max(0, viewHalfH - halfH),
       0,
-    ).multiplyScalar(1 - e);
-    // In the full view, fit the whole scene, plates included.
-    const fit = Math.min(half, Math.atan(aspect * Math.tan(half)));
-    const obliqueDist = (0.8 * Math.hypot(halfW, halfH, halfH)) / Math.sin(fit);
+    );
+    const oblique = fitOblique(covered);
+    const target = pin.lerp(oblique.target, e);
 
     const dir = new THREE.Vector3(0, 0, 1).lerp(OBLIQUE_DIR, e).normalize();
-    camera.position.copy(dir.multiplyScalar(THREE.MathUtils.lerp(flatDist, obliqueDist, e)));
-    camera.position.add(pin);
-    camera.lookAt(pin);
+    camera.position.copy(dir.multiplyScalar(THREE.MathUtils.lerp(flatDist, oblique.dist, e)));
+    camera.position.add(target);
+    camera.lookAt(target);
 
     for (const { mesh, edges, size } of plates) {
       mesh.scale.x = Math.max(e, 1e-4) * size;

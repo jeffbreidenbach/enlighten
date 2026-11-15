@@ -17,7 +17,6 @@ import { geometry } from "./physics/layout.js";
 import { FIELD_SHADER, SCREEN_SHADER, SCREEN_STEP } from "./physics/wavefield.js";
 import { createControls } from "./ui/controls.js";
 import {
-  eyeFade,
   eyePlace,
   FIELD_ROW_MAX_SHADER,
   ghost,
@@ -52,7 +51,8 @@ if (!renderer.extensions.has("EXT_color_buffer_float")) {
 }
 
 let dirty = true;
-const { params } = createControls(document.getElementById("controls"), {
+const controls = document.getElementById("controls");
+const { params } = createControls(controls, {
   onChange: () => (dirty = true),
 });
 // The layout's sizes don't change with the settings, apart from the
@@ -134,7 +134,6 @@ const U = {
   uFieldMax: { value: 1 },
   uReversed: { value: false },
   uGhost: { value: 1 },
-  uEyeFade: { value: 1 },
   uEyeY: { value: 0 },
   uFlatTop: { value: false },
 };
@@ -155,7 +154,7 @@ function pass(fragmentShader, uniforms) {
 const fieldPass = pass(FIELD_SHADER, { ...U, uMirror: { value: true } });
 const screenPass = pass(SCREEN_SHADER, { ...U, uMirror: { value: false }, uScreenX: { value: g.screenX } });
 const screenColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uFade: { value: 1 } });
-const retinaColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uReversed: { value: false }, uFade: U.uEyeFade });
+const retinaColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uReversed: { value: false }, uFade: U.uGhost });
 const fieldRowMaxPass = pass(FIELD_ROW_MAX_SHADER, { ...U, uField: { value: fieldRT.texture } });
 const sliceColorPass = pass(SLICE_COLOR_SHADER, {
   ...U,
@@ -331,10 +330,11 @@ function frame(now) {
   phase += phaseStep(g);
   uPhase.value.set(Math.cos(phase), Math.sin(phase));
   resize();
-  uStrip.value = 1 - layout(viewT);
+  // How much of the window, from the bottom, the controls cover.
+  const covered = Math.max(0, 1 - controls.offsetTop / canvas.clientHeight);
+  uStrip.value = 1 - layout(viewT, covered);
   // Virtual light fades in and out, on the screen too.
   U.uGhost.value = ghost(now / 1000);
-  U.uEyeFade.value = eyeFade(now / 1000);
   if (U.uReversed.value) {
     runPass(screenColorPass, screenColorRT);
     runPass(retinaColorPass, retinaColorRT);

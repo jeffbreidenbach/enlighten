@@ -13,17 +13,27 @@
 
 import { DEFAULT_WAVELENGTH, wavelengthCells } from "./layout.js";
 
+// The menu's shapes: filled where the beam lights them, hollow where not.
+// These are the large square and circle, the same size as each other; the
+// squares are asked to be drawn as text (U+FE0E), not as color emoji.
+const LIT_SQUARE = "\u2b1b\ufe0e";
+const DARK_SQUARE = "\u2b1c\ufe0e";
+const LIT_CIRCLE = "\u2b24";
+const DARK_CIRCLE = "\u25ef";
+
+// The apertures: each its menu label, and the name read out for it where
+// the label is only shapes.
 export const APERTURES = {
-  single: "Single slit",
-  double: "Double slit",
-  grating: "Sine grating",
-  point: "Hologram of a point",
-  point2: "Hologram of two points",
-  square: "Hologram of a square",
-  circle: "Hologram of a circle",
-  stack: "Square and circle, both lit",
-  stackSquare: "Square and circle, top half lit",
-  stackCircle: "Square and circle, bottom half lit",
+  single: ["Single slit"],
+  double: ["Double slit"],
+  grating: ["Sine grating"],
+  point: ["Hologram: \u2022", "Hologram of a point"],
+  point2: ["Hologram: \u2022 \u2022", "Hologram of two points"],
+  square: [`Hologram: ${LIT_SQUARE}`, "Hologram of a square"],
+  circle: [`Hologram: ${LIT_CIRCLE}`, "Hologram of a circle"],
+  stack: [`Hologram: ${LIT_SQUARE} + ${LIT_CIRCLE}`, "Square and circle, both lit"],
+  stackSquare: [`Hologram: ${LIT_SQUARE} + ${DARK_CIRCLE}`, "Square and circle, square lit"],
+  stackCircle: [`Hologram: ${DARK_SQUARE} + ${LIT_CIRCLE}`, "Square and circle, circle lit"],
 };
 
 // Slits run the full width of the aperture plate, so in the cross section

@@ -54,11 +54,11 @@ export const EXPLANATIONS = {
     "direction, so the eye sees only the picture on the plate it looks through: move it, and " +
     "the picture changes.",
   stackSquare:
-    "Two holograms on one plate, with only the top half lit: only the square, recorded there, " +
-    "appears. The parts of a plate can each hold a different picture.",
+    "Two stacked plates, with only the top one lit: only the square, recorded there, appears. " +
+    "Each plate can hold a different picture.",
   stackCircle:
-    "Two holograms on one plate, with only the bottom half lit: only the circle, recorded " +
-    "there, appears. A holographic stereogram holds many views this way, one per strip.",
+    "Two stacked plates, with only the bottom one lit: only the circle, recorded there, " +
+    "appears. A holographic stereogram holds many views this way, one per strip.",
 
   // Sliders.
   plate:

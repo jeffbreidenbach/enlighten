@@ -65,7 +65,11 @@ export function createControls(panel, { onChange }) {
 
   const apRow = row(group, "Aperture");
   const apSelect = document.createElement("select");
-  for (const [key, label] of Object.entries(APERTURES)) apSelect.add(new Option(label, key));
+  for (const [key, [label, spoken]] of Object.entries(APERTURES)) {
+    const option = new Option(label, key);
+    if (spoken) option.setAttribute("aria-label", spoken);
+    apSelect.add(option);
+  }
   apSelect.addEventListener("change", () => {
     params.aperture = apSelect.value;
     sync();

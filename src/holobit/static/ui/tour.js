@@ -7,15 +7,14 @@ export const TOUR = [
   {
     set: {},
     text:
-      "Light is a wave. Here it spreads from a point on the left and meets a wall with one narrow " +
-      "slit. Instead of passing straight through, it fans out from the slit as if the slit were a " +
-      "new source. This is diffraction.",
+      "Light is a wave. Here it spreads from a point and meets a wall with one narrow slit, " +
+      "then fans out from the slit as if it were a new source. This is diffraction.",
   },
   {
     set: { aperture: "double" },
     text:
-      "Two slits make two sources. Where their crests meet the light adds up; where a crest meets a " +
-      "trough it cancels. The bright and dark bands on the screen are interference fringes.",
+      "Two slits make two sources. Where crests meet, the light adds up; where a crest meets a " +
+      "trough, it cancels. The bands on the screen are interference fringes.",
   },
   {
     set: { wavelength: 450 },
@@ -26,8 +25,8 @@ export const TOUR = [
   {
     set: { wavelength: 650 },
     text:
-      "Longer, redder waves spread the fringes wider apart. Holograms bend light by color in just " +
-      "this way, which is why one lit by white light shimmers like a rainbow.",
+      "Longer, redder waves spread the fringes wider. Holograms bend each color by its own " +
+      "amount, which is why one lit by white light shimmers like a rainbow.",
   },
   {
     set: { angle: 45 },
@@ -44,8 +43,8 @@ export const TOUR = [
   {
     set: { view: "full" },
     text:
-      "Step back to see the whole setup: the light source, raised above the axis, the plate with " +
-      "the slits, and the screen. A piece of film where the screen is would record those fringes.",
+      "Step back to see the whole setup: the raised source, the plate with the slits, and the " +
+      "screen. Film placed at the screen would record those fringes.",
   },
   {
     set: { angle: 0 },
@@ -60,106 +59,89 @@ export const TOUR = [
   {
     set: { view: "cross" },
     text:
-      "Infinitely far away, the source's wavefronts are flat: a plane wave, all moving one way, " +
-      "like a laser beam. Holograms are recorded and replayed with light like this, called the " +
-      "reference beam.",
+      "Infinitely far away, the wavefronts are flat: a plane wave, like a laser beam. Holograms " +
+      "are recorded and replayed with light like this, the reference beam.",
   },
   {
     set: { aperture: "grating" },
     text:
-      "A sine grating is a plate whose transparency rises and falls smoothly in stripes. It is " +
-      "what two plane waves record on film: the simplest hologram. It splits the beam into a few " +
-      "separate beams, called orders.",
+      "A sine grating's transparency rises and falls smoothly in stripes: what two plane waves " +
+      "record on film, the simplest hologram. It splits the beam into a few orders.",
   },
   {
     set: { angle: 45 },
     text:
-      "Tilt the beam to 45 degrees. Some light carries on at 45 degrees, but the grating bends the " +
-      "rest straight ahead. Separating the useful beam from the leftover light this way is the key " +
-      "to off-axis holography.",
+      "Tilt the beam to 45 degrees. Some light carries on at 45 degrees, but the grating bends " +
+      "the rest straight ahead, away from the leftover light: off-axis holography.",
   },
   {
     set: { aperture: "point" },
     text:
-      "Now curve the grating's fringes, as a point's light records them with this reference " +
-      "beam: a hologram of a point, bleached clear. The light it bends straight ahead now " +
-      "converges to a small, bright spot on the screen, recreating the point; the leftover " +
-      "light carries on at 45 degrees.",
+      "Curve the fringes as a point's light records them, and bleach it clear: a hologram of a " +
+      "point. The light it bends straight ahead converges to a spot on the screen.",
   },
   {
     set: { view: "full" },
     text:
-      "From the side, the light bends level and converges from the hologram to a bright spot on " +
-      "the screen, while the leftover light heads off at 45 degrees. A hologram of a whole " +
-      "object records every point of it at once.",
+      "From the side: the light bends level and converges to a spot on the screen, while the " +
+      "leftover light heads off at 45 degrees.",
   },
   {
     set: { aperture: "point2" },
     text:
-      "Record two points on one plate, and it focuses light to both at once. Add enough points " +
-      "and you have an image. A holographic stereogram builds its image from many small " +
-      "holograms, each showing the scene from a different viewpoint.",
+      "Record two points on one plate, and it focuses light to both. Add enough points and you " +
+      "have an image.",
   },
   {
     set: { plate: 112 },
     text:
-      "Make the plate bigger. With more of the hologram lit, the spots shrink: the bigger the " +
-      "hologram, the sharper the image it can make.",
+      "A bigger plate makes smaller spots: the bigger the hologram, the sharper its image.",
   },
   {
     set: { aperture: "square" },
     text:
-      "Now a whole shape: a hologram of the outline of a square, worked out from the square " +
-      "itself. The light of every point of the outline meets the reference beam on the film, " +
-      "and the film records it all at once. Lit again, it rebuilds the square on the screen.",
+      "Now a whole shape: the outline of a square. Every point of it meets the reference beam " +
+      "on the film at once; lit again, the film rebuilds the square on the screen.",
   },
   {
     set: { aperture: "circle" },
     text:
-      "A hologram of a circle, the same size, recorded the same way. Any shape can be recorded: " +
-      "a hologram is worked out from the light of whatever it shows.",
+      "A circle, the same size, recorded the same way. A hologram can show any shape.",
   },
   {
     set: { aperture: "stackCircle" },
     text:
-      "Now one plate holds two holograms: the square on its top half and the circle on its " +
-      "bottom half, both made to land in the same place on the screen. Light only the bottom " +
-      "half, and the circle appears.",
+      "Now two plates, stacked: the square above, the circle below, both landing in the same " +
+      "place on the screen. Light only the bottom one, and the circle appears.",
   },
   {
     set: { aperture: "stackSquare" },
     text:
-      "Light only the top half, and the square takes the circle's place. Each part of the " +
-      "plate holds its own picture, and the light picks which one you see. A holographic " +
-      "stereogram is built this way: many strips, each holding one view of a scene.",
+      "Light only the top plate, and the square takes its place. The light picks the picture: a " +
+      "holographic stereogram is many strips, each holding one view.",
   },
   {
     set: { reversed: true },
     text:
-      "Now reverse the beam, so it comes from the screen's side. The hologram sends its light " +
-      "back too, spreading as if from the square on the screen. In fading white: that light " +
-      "traced back to where it seems to come from, which is not really there. The square is " +
-      "now a virtual image.",
+      "Reverse the beam. The light now spreads back as if from the square on the screen. In " +
+      "fading white: where it seems to come from. The square is a virtual image.",
   },
   {
     set: { aperture: "stackCircle" },
     text:
-      "Light the bottom half instead, and the virtual image becomes the circle, in the same " +
-      "place. Each part of the plate shows its own picture, seen where the light seems to " +
-      "come from: the idea behind a holographic stereogram.",
+      "Light the bottom plate instead, and the virtual image becomes the circle, in the same " +
+      "place.",
   },
   {
     set: { aperture: "stack", eyeHalf: -1 },
     text:
-      "Now one wide beam lights both plates. Both send their light back, but each in its own " +
-      "direction, and the eye, looking through the bottom plate, catches only the circle's. So " +
-      "it sees only the circle.",
+      "One wide beam lights both plates. Each sends its light its own way; the eye, looking " +
+      "through the bottom plate, sees only the circle.",
   },
   {
     set: { eyeHalf: 1 },
     text:
-      "Move the eye to look through the top plate, and it sees only the square. Where the eye " +
-      "is decides what it sees: a holographic stereogram shows each eye position its own view " +
-      "this way, from many such strips.",
+      "Through the top plate, the eye sees only the square. A stereogram shows each eye " +
+      "position its own view.",
   },
 ];

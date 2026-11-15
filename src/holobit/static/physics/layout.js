@@ -6,10 +6,9 @@
 // line. Positions are in grid cells, the pixels of the cross section: x
 // runs along the axis, y is the height.
 
-// The cross section is 640 x 300 base cells, plus a 20-cell strip for the
-// screen: a 2.2:1 shape that suits laptop windows, leaving a band below
-// for the controls.
-const BASE_W = 640;
+// The cross section is 800 x 300 base cells, plus a 20-cell strip for the
+// screen: a wide shape, leaving a band below for the controls.
+const BASE_W = 800;
 const BASE_H = 300;
 // Grid cells per base cell. Sizes are given in base cells; the grid is
 // twice as fine so that waves, only 4 base cells long, draw smoothly.
@@ -27,11 +26,12 @@ export const DEFAULT_WAVELENGTH = 550;
 export const DEFAULT_PLATE = 80;
 export const MIN_PLATE = 48;
 export const MAX_PLATE = 160;
-// The aperture plate is 96 base cells in. At its nearest, and an incident
-// angle of 0, the point source sits at the left edge, just far enough in
-// for its dot to show; at other angles it moves along an arc, staying the
-// same distance from the plate's center.
-const APERTURE_X = 96;
+// The aperture plate is 256 base cells in, leaving room before it for the
+// light leaving it when the beam is reversed, and the eye that sees it.
+// The point source comes no nearer the plate's center than
+// NEAREST_SOURCE; as the incident angle changes, it moves along an arc,
+// staying the same distance from it.
+const APERTURE_X = 256;
 const NEAREST_SOURCE = 93;
 
 // A wavelength's length in base cells.
