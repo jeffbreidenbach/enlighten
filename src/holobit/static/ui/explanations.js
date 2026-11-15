@@ -44,6 +44,18 @@ export const EXPLANATIONS = {
     "every point of the outline meets the reference beam on the film, and the film records it " +
     "all at once. Lit again, it rebuilds the whole outline on the screen. Its lines are as " +
     "sharp as the hologram is big.",
+  circle:
+    "A hologram of the outline of a circle, recorded like the square: worked out from the light " +
+    "of every point of it. Lit again, it rebuilds the circle on the screen.",
+  stack:
+    "Two holograms on one plate: the square on the top half, the circle on the bottom half, " +
+    "both landing in the same place on the screen. Lit all over, the plate shows both at once.",
+  stackSquare:
+    "Two holograms on one plate, with only the top half lit: only the square, recorded there, " +
+    "appears. The parts of a plate can each hold a different picture.",
+  stackCircle:
+    "Two holograms on one plate, with only the bottom half lit: only the circle, recorded " +
+    "there, appears. A holographic stereogram holds many views this way, one per strip.",
 
   // Sliders.
   plate:

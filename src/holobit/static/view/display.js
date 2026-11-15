@@ -71,17 +71,21 @@ uniform vec2 uPhase, uBeamDir;
 uniform vec3 uHue;
 uniform float uMaxIntensity, uFieldMax, uWidth, uScale, uSourceX, uSourceY, uCurvature, uCenterY;
 uniform float uApertureX, uWallHalf, uApertureHalf;
+// The heights the beam lights on the plate, from its center, and how far
+// above and below it the two beams of a stacked plate are centered.
+uniform vec2 uLit;
+uniform float uBeamGap;
 // How much of the screen strip shows: 1 in the cross section, fading to 0
 // in the full view, where the screen plate itself stands there.
 uniform float uStrip;
 out vec4 outColor;
 
 // The light before the plate is drawn as a beam aimed at it: it shows only
-// where it is headed for the plate. For a point source that is the wedge
-// from the source to the plate's top and bottom edges, narrowing as the
-// source moves away; for a plane wave, the band of parallel rays that hit
-// it. The beam is soft-edged, as
-// in the sums.
+// where it is headed for the part of the plate it lights (uLit). For a
+// point source that is the wedge from the source to that part's top and
+// bottom edges, narrowing as the source moves away; for a plane wave, the
+// band of parallel rays that hit it. The beam is soft-edged, as in the
+// sums.
 float beam(vec2 c) {
   if (c.x >= uApertureX - uWallHalf) return 1.0;
   // Where the ray through c meets the plate, and how much closer together
@@ -97,8 +101,9 @@ float beam(vec2 c) {
     hit = sourceRow + (c.y - sourceRow) * (uApertureX - uSourceX) / along;
     squeeze = along / (uApertureX - uSourceX);
   }
-  float inside = (uApertureHalf - abs(hit - uCenterY)) * squeeze;
-  float t = (hit - uCenterY) / uApertureHalf;
+  float inside = min(hit - uCenterY - uLit.x, uLit.y - hit + uCenterY) * squeeze;
+  float fromCenter = hit - uCenterY;
+  float t = (fromCenter - (fromCenter >= 0.0 ? uBeamGap : -uBeamGap)) / uApertureHalf;
   return smoothstep(-1.5, 1.5, inside) * exp(-${float(BEAM_FALLOFF)} * t * t);
 }
 

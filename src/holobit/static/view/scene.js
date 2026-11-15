@@ -40,10 +40,11 @@ export function createScene(g, sliceTexture, screenTexture) {
     ),
   );
 
-  // A square plate `size` grid cells across, standing across the axis at
-  // grid column x. Turned to face along the axis, its local x runs out of
-  // the cross section, so scaling that squeezes it to a line. It is built
-  // one unit across and scaled to its size, so it can be resized.
+  // A plate `size` grid cells across and as tall (a stacked aperture plate
+  // is resized to twice as tall), standing across the axis at grid column
+  // x. Turned to face along the axis, its local x runs out of the cross
+  // section, so scaling that squeezes it to a line. It is built one unit
+  // across and scaled to its size, so it can be resized.
   function makePlate(x, texture, size) {
     const geo = new THREE.PlaneGeometry(UNIT, UNIT);
     const mesh = new THREE.Mesh(
@@ -69,12 +70,12 @@ export function createScene(g, sliceTexture, screenTexture) {
   }
 
   // The aperture plate is painted on a canvas big enough for the largest
-  // plate, of which only the corner the plate's size needs is shown; the
-  // screen is as tall as the cross section. There is no plate at the
+  // plate, stacked, of which only the corner the plate's size needs is
+  // shown; the screen is as tall as the cross section. There is no plate at the
   // source: the cross section already shows where the light starts, and a
   // plane wave has no single source.
   const M = g.maxApertureSize;
-  const apertureCanvas = Object.assign(document.createElement("canvas"), { width: M, height: M });
+  const apertureCanvas = Object.assign(document.createElement("canvas"), { width: M, height: 2 * M });
   const apertureTexture = new THREE.CanvasTexture(apertureCanvas);
   const aperturePlate = makePlate(g.apertureX + 0.5, apertureTexture, g.apertureSize);
   const plates = [aperturePlate, makePlate(g.screenX, screenTexture, g.H)];
@@ -84,16 +85,17 @@ export function createScene(g, sliceTexture, screenTexture) {
   // hologram, clear, shaded by how much it delays the light.
   function drawAperture(ap, g) {
     const A = g.apertureSize;
+    const T = ap.height;
     aperturePlate.size = A;
-    aperturePlate.mesh.scale.y = A;
+    aperturePlate.mesh.scale.y = T;
     // The canvas's top-left corner; textures run bottom up.
-    apertureTexture.repeat.set(A / M, A / M);
-    apertureTexture.offset.set(0, 1 - A / M);
+    apertureTexture.repeat.set(A / M, T / (2 * M));
+    apertureTexture.offset.set(0, 1 - T / (2 * M));
     const ctx = apertureCanvas.getContext("2d");
-    const img = ctx.createImageData(A, A);
-    for (let cy = 0; cy < A; cy++) {
+    const img = ctx.createImageData(A, T);
+    for (let cy = 0; cy < T; cy++) {
       // Canvas rows run top down; the cross section's rows bottom up.
-      const row = g.centerY + A / 2 - 1 - cy;
+      const row = g.centerY + T / 2 - 1 - cy;
       for (let cx = 0; cx < A; cx++) {
         let color = WALL;
         let alpha = 110;

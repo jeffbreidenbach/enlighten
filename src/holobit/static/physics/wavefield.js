@@ -19,7 +19,7 @@
 //   uWavelets, uWaveletCount, uMode
 //                  the wavelets to sum, and whether they are slit rows or
 //                  a hologram's grid
-//   uPlate, uPlateN, uPlateStep, uMirror
+//   uPlate, uPlateRows, uPlateCols, uPlateStep, uMirror
 //                  a hologram's grid (see plateSum)
 
 import { float, HEAD } from "../glsl.js";
@@ -29,7 +29,7 @@ import { MODE_PLATE, ROW_HOLOGRAM, ROW_OPEN } from "./aperture.js";
 // height above the axis and p.x the distance out of the cross section.
 const WAVEFIELD = `
 uniform float uK, uCurvature, uApertureX, uWallHalf, uApertureHalf, uCenterY;
-uniform int uMode, uWaveletCount, uPlateN;
+uniform int uMode, uWaveletCount, uPlateRows, uPlateCols;
 uniform float uPlateStep;
 uniform bool uMirror;
 uniform vec2 uBeamDir;
@@ -80,18 +80,19 @@ vec2 slitRow(vec4 w, float dx, vec2 p) {
 }
 
 // A hologram: the sum of the wavelets from the grid of points across it
-// (uPlate, uPlateN points on a side, uPlateStep apart, centered on the
+// (uPlate, uPlateRows by uPlateCols points, uPlateStep apart, centered on the
 // plate). Every hologram is the same on either side of the cross
 // section, so in it (uMirror) each point out of it stands in for its
 // mirror image too.
 vec2 plateSum(float dx, vec2 p) {
-  int mid = (uPlateN - 1) / 2;
+  int rowMid = (uPlateRows - 1) / 2;
+  int mid = (uPlateCols - 1) / 2;
   int first = uMirror ? mid : 0;
   vec2 sum = vec2(0.0);
-  for (int i = 0; i < uPlateN; i++) {
-    float dy = p.y - float(i - mid) * uPlateStep;
+  for (int i = 0; i < uPlateRows; i++) {
+    float dy = p.y - float(i - rowMid) * uPlateStep;
     float across2 = dx * dx + dy * dy;
-    for (int j = first; j < uPlateN; j++) {
+    for (int j = first; j < uPlateCols; j++) {
       float dz = p.x - float(j - mid) * uPlateStep;
       float r = sqrt(across2 + dz * dz);
       vec2 w = cmul(texelFetch(uPlate, ivec2(j, i), 0).xy, wavelet(r, dx));

@@ -114,4 +114,24 @@ export const TOUR = [
       "itself. The light of every point of the outline meets the reference beam on the film, " +
       "and the film records it all at once. Lit again, it rebuilds the square on the screen.",
   },
+  {
+    set: { aperture: "circle" },
+    text:
+      "A hologram of a circle, the same size, recorded the same way. Any shape can be recorded: " +
+      "a hologram is worked out from the light of whatever it shows.",
+  },
+  {
+    set: { aperture: "stackSquare" },
+    text:
+      "Now one plate holds two holograms: the square on its top half and the circle on its " +
+      "bottom half, both made to land in the same place on the screen. Light only the top half, " +
+      "and the square appears.",
+  },
+  {
+    set: { aperture: "stackCircle" },
+    text:
+      "Light only the bottom half, and the circle takes the square's place. Each part of the " +
+      "plate holds its own picture, and the light picks which one you see. A holographic " +
+      "stereogram is built this way: many strips, each holding one view of a scene.",
+  },
 ];

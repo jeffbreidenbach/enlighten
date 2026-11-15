@@ -111,12 +111,15 @@ const U = {
   uApertureX: { value: g.apertureX },
   uWallHalf: { value: g.wallHalf },
   uApertureHalf: { value: g.apertureSize / 2 },
+  uLit: { value: new THREE.Vector2() },
+  uBeamGap: { value: 0 },
   uCenterY: { value: g.centerY },
   uRows: { value: rowsTex },
   uWavelets: { value: null },
   uWaveletCount: { value: 0 },
   uPlate: { value: null },
-  uPlateN: { value: 0 },
+  uPlateRows: { value: 0 },
+  uPlateCols: { value: 0 },
   uPlateStep: { value: 1 },
   uMode: { value: 0 },
   uScreen: { value: screenRT.texture },
@@ -193,10 +196,13 @@ function startCompute() {
   U.uWavelets.value = dataTexture(ap.wavelets);
   U.uWaveletCount.value = ap.count;
   U.uPlate.value?.dispose();
-  U.uPlate.value = ap.plate ? dataTexture(ap.plate.data, ap.plate.n) : dataTexture(new Float32Array(4));
-  U.uPlateN.value = ap.plate?.n ?? 0;
+  U.uPlate.value = ap.plate ? dataTexture(ap.plate.data, ap.plate.cols) : dataTexture(new Float32Array(4));
+  U.uPlateRows.value = ap.plate?.rows ?? 0;
+  U.uPlateCols.value = ap.plate?.cols ?? 0;
   U.uPlateStep.value = ap.plate?.step ?? 1;
   U.uMode.value = ap.mode;
+  U.uLit.value.set(...ap.lit);
+  U.uBeamGap.value = ap.beamGap;
   U.uK.value = g.k;
   U.uCurvature.value = g.curvature;
   U.uApertureHalf.value = g.apertureSize / 2;
@@ -208,9 +214,9 @@ function startCompute() {
 
   // How many wavelet sums each pixel needs: one per slit row, or one per
   // point of a hologram's grid, only half of them in the cross section.
-  const n = ap.plate?.n;
-  const fieldCost = ap.plate ? (n * (n + 1)) / 2 : ap.count;
-  const screenCost = ap.plate ? n * n : ap.count;
+  const { rows, cols } = ap.plate ?? {};
+  const fieldCost = ap.plate ? (rows * (cols + 1)) / 2 : ap.count;
+  const screenCost = ap.plate ? rows * cols : ap.count;
   job = { fieldRow: 0, screenRow: 0, fieldCost, screenCost };
 }
 
