@@ -21,7 +21,7 @@ export const APERTURES = {
   point2: "Hologram of two points",
   square: "Hologram of a square",
   circle: "Hologram of a circle",
-  stack: "Square and circle, stacked",
+  stack: "Square and circle, both lit",
   stackSquare: "Square and circle, top half lit",
   stackCircle: "Square and circle, bottom half lit",
 };
@@ -112,21 +112,24 @@ function circlePoints() {
 // the plate: [object, part], the part 0 for the whole plate, 1 for its top
 // half, -1 for its bottom half. The stacked hologram records the square
 // on the top half and the circle on the bottom, both in the same place on
-// the screen, and is lit by a beam covering the whole plate or only
-// `lit`, one half of it: the first idea behind holographic stereograms,
-// which record a different view on each part of the plate. So that each
-// half is as big as a plate of one hologram, the stacked plate is twice as
-// tall as the plate size, and each half has a beam of its own, centered
-// on it.
+// the screen: the first idea behind holographic stereograms, which record
+// a different view on each part of the plate. So that each half is as big
+// as a plate of one hologram, the stacked plate is twice as tall as the
+// plate size. It is lit either by a beam of its own centered on one half,
+// `lit`, or by one wide beam across both. The halves are two plates,
+// DIVIDER base cells apart. (The beam would slip through the gap between
+// them as a thin sliver of light, which would only clutter the picture;
+// it is left out.)
 const STACKED = [
   ["square", 1],
   ["circle", -1],
 ];
+const DIVIDER = 2;
 const HOLOGRAMS = {
   ...Object.fromEntries(
     Object.keys(OBJECTS).map((name) => [name, { parts: [[name, 0]], lit: 0, stacked: false }]),
   ),
-  stack: { parts: STACKED, lit: 0, stacked: true },
+  stack: { parts: STACKED, lit: 0, stacked: true, wide: true },
   stackSquare: { parts: STACKED, lit: 1, stacked: true },
   stackCircle: { parts: STACKED, lit: -1, stacked: true },
 };
@@ -153,10 +156,32 @@ export function beamProfile(g, d) {
   return Math.exp(-BEAM_FALLOFF * t * t);
 }
 
+// The one wide beam across both plates of a stacked hologram is shaped to
+// them and has a flat top, as holographers get by spreading a laser beam
+// wide and using its even middle: its strength falls as
+// exp(-BEAM_FALLOFF t^(2 FLAT_TOP)), t as above but across the stacked
+// plate, so it lights both plates evenly and fades only at their outer
+// edges. (A plain Gaussian that wide would light each plate brightly
+// only beside the gap, making blurry, lopsided images.)
+export const FLAT_TOP = 3;
+
+function wideBeamProfile(g, y, z, height) {
+  const t2 = (y / (height / 2)) ** 2 + (z / (g.apertureSize / 2)) ** 2;
+  return Math.exp(-BEAM_FALLOFF * t2 ** FLAT_TOP);
+}
+
 // The middle of the beam lighting height y of a plate: its center, or for
-// a stacked plate, the center of y's half.
-function beamCenter(g, stacked, y) {
-  return stacked ? (y >= 0 ? 1 : -1) * (g.apertureSize / 2) : 0;
+// a stacked plate lit one half at a time, the center of y's half.
+function beamCenter(g, hologram, y) {
+  return hologram.stacked && !hologram.wide ? (y >= 0 ? 1 : -1) * (g.apertureSize / 2) : 0;
+}
+
+// Which half of a stacked plate the eye looks through when the beam is
+// reversed (see the eye in display.js): the lit half, or with both lit,
+// the one params.eyeHalf picks; 0, the whole plate, for others.
+function seenPart(params, hologram) {
+  if (!hologram?.stacked) return 0;
+  return hologram.lit !== 0 ? hologram.lit : params.eyeHalf;
 }
 
 // What each row of the aperture line is, in the cross section. Rows
@@ -176,13 +201,20 @@ export const MODE_PLATE = 1;
 // plate's size, so each is recorded once and kept.
 const recordings = new Map();
 
+//
+// Each recording is { exposure, light }: light the object's light at each
+// point, relative to the reference beam, [re, im], scaled like the
+// exposure, which is its real part.
 function record(g, parts, grid) {
   const key = `${JSON.stringify(parts)} ${grid.rows} ${grid.cols} ${grid.step}`;
   if (recordings.has(key)) return recordings.get(key);
-  const exposure = new Float32Array(grid.rows * grid.cols);
-  for (const [name, part] of parts) recordPart(g, OBJECTS[name], part, grid, exposure);
-  recordings.set(key, exposure);
-  return exposure;
+  const recording = {
+    exposure: new Float32Array(grid.rows * grid.cols),
+    light: new Float32Array(grid.rows * grid.cols * 2),
+  };
+  for (const [name, part] of parts) recordPart(g, OBJECTS[name], part, grid, recording);
+  recordings.set(key, recording);
+  return recording;
 }
 
 // Whether height y on the plate is in part (see HOLOGRAMS).
@@ -190,8 +222,8 @@ function inPart(part, y) {
   return part === 0 || (part > 0 ? y >= 0 : y < 0);
 }
 
-// Records object on its part of the plate, into exposure.
-function recordPart(g, object, part, grid, exposure) {
+// Records object on its part of the plate, into recording.
+function recordPart(g, object, part, grid, recording) {
   const k = (2 * Math.PI) / (wavelengthCells(DEFAULT_WAVELENGTH) * g.scale);
   const toScreen = g.screenX - g.apertureX;
   const refDir = -Math.sin((REFERENCE_ANGLE * Math.PI) / 180);
@@ -230,7 +262,8 @@ function recordPart(g, object, part, grid, exposure) {
     if (!inPart(part, (i - grid.rowMid) * grid.step)) continue;
     for (let j = 0; j < grid.cols; j++) {
       const at = i * grid.cols + j;
-      exposure[at] = light[2 * at] / brightest;
+      recording.exposure[at] = light[2 * at] / brightest;
+      recording.light.set([light[2 * at] / brightest, light[2 * at + 1] / brightest], 2 * at);
     }
   }
 }
@@ -261,7 +294,8 @@ function arriving(g, y, z = 0) {
 //   result), leaving one term per row. re and im include the light
 //   arriving from the source.
 // - holograms: `plate` holds the light leaving each point of the grid
-//   across it, [re, im, 0, 0]: plate.rows by plate.cols points,
+//   across it, [re, im, and with the beam reversed, the image's light
+//   re, im (see plateGrid)]: plate.rows by plate.cols points,
 //   plate.step grid cells apart, centered on the plate, plate.rowMid and
 //   plate.colMid the middle ones. Its `exposure` is what the film
 //   recorded at each.
@@ -269,11 +303,17 @@ function arriving(g, y, z = 0) {
 // - lit: the heights the beam lights on the plate, [low, high], measured
 //   from its center, and beamGap: how far above and below the center the
 //   two beams of a stacked plate are centered, or 0 for one beam.
+// - beamHalf: how far the beam reaches from its middle to its edge, and
+//   flatTop: whether it is the flat-topped wide beam.
+// - seen: the height of the middle of the part of the plate the eye looks
+//   through when the beam is reversed.
+// - gap: how tall the gap between a stacked plate's two halves is.
 // Light is scaled so the incoming wave has strength 1 and phase 0 at the
 // plate's center.
 export function aperture(params, g) {
   const hologram = HOLOGRAMS[params.aperture];
-  const plate = hologram ? plateGrid(g, hologram) : null;
+  const seen = seenPart(params, hologram);
+  const plate = hologram ? plateGrid(g, hologram, params.reversed, seen) : null;
   // How tall the plate is.
   const height = hologram?.stacked ? 2 * g.apertureSize : g.apertureSize;
   const kind = new Uint8Array(g.H);
@@ -287,8 +327,12 @@ export function aperture(params, g) {
     kind[row] = ROW_WALL;
 
     if (plate) {
-      kind[row] = ROW_HOLOGRAM;
-      depth[row] = shade(plate, 0, y);
+      if (inDivider(g, hologram, y)) {
+        kind[row] = 0;
+      } else {
+        kind[row] = ROW_HOLOGRAM;
+        depth[row] = shade(plate, 0, y);
+      }
       continue;
     }
 
@@ -328,7 +372,11 @@ export function aperture(params, g) {
     count: list.length,
     height,
     lit: [hologram?.lit > 0 ? 0 : -height / 2, hologram?.lit < 0 ? 0 : height / 2],
-    beamGap: hologram?.stacked ? g.apertureSize / 2 : 0,
+    beamGap: hologram?.stacked && !hologram.wide ? g.apertureSize / 2 : 0,
+    beamHalf: hologram?.wide ? height / 2 : g.apertureSize / 2,
+    flatTop: Boolean(hologram?.wide),
+    seen: (seen * g.apertureSize) / 2,
+    gap: hologram?.stacked ? DIVIDER * g.scale : 0,
   };
 }
 
@@ -345,28 +393,56 @@ export function shade(plate, z, y) {
 // radiates k / 2 pi times as strongly, with a 90 degree lag. Where the
 // beam lights only half the plate, it fades out over a few grid cells
 // across the middle.
-function plateGrid(g, hologram) {
+//
+// With the beam reversed, each point of the part of the plate the eye
+// looks through, `seen`, also holds, in its last two values, the light
+// the image alone would leave with under the beam the right way round: what arrives there times the conjugate of the object's
+// light, so that it converges on the object. Its conjugate, the same
+// light running backwards, is the virtual light the reversed beam's light
+// seems to come from. g is then the mirrored geometry (see wavefield.js),
+// so the beam the right way round arrives at height -y where the mirrored
+// one arrives at y. (Virtual light is where light seems to come from to
+// a viewer, so only the light that reaches the eye has it.)
+function plateGrid(g, hologram, reversed, seen) {
   const step = PLATE_STEP * g.scale;
   const colMid = Math.floor(g.apertureSize / 2 / step);
   const rowMid = hologram.stacked ? 2 * colMid : colMid;
   const [cols, rows] = [2 * colMid + 1, 2 * rowMid + 1];
   const grid = { rows, cols, rowMid, colMid, step };
-  const exposure = record(g, hologram.parts, grid);
+  const { exposure, light } = record(g, hologram.parts, grid);
   const data = new Float32Array(rows * cols * 4);
   const weight = (g.k / (2 * Math.PI)) * step * step;
   for (let i = 0; i < rows; i++) {
     const y = (i - rowMid) * step;
-    const fromCenter = y - beamCenter(g, hologram.stacked, y);
-    const lit = hologram.lit === 0 ? 1 : smoothstep(-1.5, 1.5, hologram.lit * y);
+    const fromCenter = y - beamCenter(g, hologram, y);
+    const lit = inDivider(g, hologram, y)
+      ? 0
+      : hologram.lit === 0
+        ? 1
+        : smoothstep(-1.5, 1.5, hologram.lit * y);
     for (let j = 0; j < cols; j++) {
       const z = (j - colMid) * step;
       const { amplitude, delay } = arriving(g, y, z);
-      const strength = weight * amplitude * lit * beamProfile(g, Math.hypot(fromCenter, z));
-      const phase = g.k * delay + BLEACH * exposure[i * cols + j] - Math.PI / 2;
-      data.set([strength * Math.cos(phase), strength * Math.sin(phase), 0, 0], (i * cols + j) * 4);
+      const profile = hologram.wide
+        ? wideBeamProfile(g, y, z, 2 * rowMid * step)
+        : beamProfile(g, Math.hypot(fromCenter, z));
+      const strength = weight * amplitude * lit * profile;
+      const at = i * cols + j;
+      const phase = g.k * delay + BLEACH * exposure[at] - Math.PI / 2;
+      data.set([strength * Math.cos(phase), strength * Math.sin(phase)], at * 4);
+      if (!reversed || !inPart(seen, y)) continue;
+      const forward = g.k * arriving(g, -y, z).delay - Math.PI / 2;
+      const [re, im] = [light[2 * at], -light[2 * at + 1]];
+      const [c, s] = [strength * Math.cos(forward), strength * Math.sin(forward)];
+      data.set([re * c - im * s, re * s + im * c], at * 4 + 2);
     }
   }
   return { ...grid, data, exposure };
+}
+
+// Whether height y is in the gap between a stacked plate's two halves.
+function inDivider(g, hologram, y) {
+  return hologram.stacked && Math.abs(y) <= (DIVIDER / 2) * g.scale;
 }
 
 // As in GLSL: 0 below edge0, 1 above edge1, smooth in between.

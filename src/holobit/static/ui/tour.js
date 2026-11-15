@@ -102,10 +102,10 @@ export const TOUR = [
       "holograms, each showing the scene from a different viewpoint.",
   },
   {
-    set: { plate: 160 },
+    set: { plate: 112 },
     text:
-      "Double the size of the plate. With twice as much of the hologram lit, the spots shrink to " +
-      "half the size: the bigger the hologram, the sharper the image it can make.",
+      "Make the plate bigger. With more of the hologram lit, the spots shrink: the bigger the " +
+      "hologram, the sharper the image it can make.",
   },
   {
     set: { aperture: "square" },
@@ -121,17 +121,47 @@ export const TOUR = [
       "a hologram is worked out from the light of whatever it shows.",
   },
   {
-    set: { aperture: "stackSquare" },
+    set: { aperture: "stackCircle" },
     text:
       "Now one plate holds two holograms: the square on its top half and the circle on its " +
-      "bottom half, both made to land in the same place on the screen. Light only the top half, " +
-      "and the square appears.",
+      "bottom half, both made to land in the same place on the screen. Light only the bottom " +
+      "half, and the circle appears.",
+  },
+  {
+    set: { aperture: "stackSquare" },
+    text:
+      "Light only the top half, and the square takes the circle's place. Each part of the " +
+      "plate holds its own picture, and the light picks which one you see. A holographic " +
+      "stereogram is built this way: many strips, each holding one view of a scene.",
+  },
+  {
+    set: { reversed: true },
+    text:
+      "Now reverse the beam: it comes from the screen's side, travelling back the way it went. " +
+      "The hologram sends its light back too, heading away from the screen, but spreading as " +
+      "if it came from the square on the screen. Drawn in white, fading in and out, is that " +
+      "light traced back to where it seems to come from: virtual light, which is not really " +
+      "there, and the square it seems to come from, a virtual image.",
   },
   {
     set: { aperture: "stackCircle" },
     text:
-      "Light only the bottom half, and the circle takes the square's place. Each part of the " +
-      "plate holds its own picture, and the light picks which one you see. A holographic " +
-      "stereogram is built this way: many strips, each holding one view of a scene.",
+      "Light the bottom half instead, and the virtual image becomes the circle, in the same " +
+      "place. Each part of the plate shows its own picture, seen where the light seems to " +
+      "come from: the idea behind a holographic stereogram.",
+  },
+  {
+    set: { aperture: "stack", eyeHalf: -1 },
+    text:
+      "Now one wide beam lights both plates. Both send their light back, but each in its own " +
+      "direction, and the eye, looking through the bottom plate, catches only the circle's. So " +
+      "it sees only the circle.",
+  },
+  {
+    set: { eyeHalf: 1 },
+    text:
+      "Move the eye to look through the top plate, and it sees only the square. Where the eye " +
+      "is decides what it sees: a holographic stereogram shows each eye position its own view " +
+      "this way, from many such strips.",
   },
 ];

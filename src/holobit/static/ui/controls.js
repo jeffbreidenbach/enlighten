@@ -1,8 +1,10 @@
 // The control panel: the controls on the left, then a short explanation
 // of whatever was just changed, then the tour's back and next buttons.
 // Changing the aperture, plate size, source distance, wavelength or
-// incident angle calls onChange, which recomputes the light; the view
-// button switches between the cross section and the full view.
+// incident angle, or reversing the beam, calls onChange, which recomputes
+// the light; the view button switches between the cross section and the
+// full view. With both plates of a stacked hologram lit and the beam
+// reversed, another button moves the eye between them.
 
 import { APERTURES } from "../physics/aperture.js";
 import {
@@ -24,6 +26,8 @@ const DEFAULTS = {
   wavelength: DEFAULT_WAVELENGTH,
   angle: 0,
   view: "cross",
+  reversed: false,
+  eyeHalf: 1,
 };
 
 // When a tour step moves a slider, it sweeps there instead of jumping:
@@ -64,6 +68,7 @@ export function createControls(panel, { onChange }) {
   for (const [key, label] of Object.entries(APERTURES)) apSelect.add(new Option(label, key));
   apSelect.addEventListener("change", () => {
     params.aperture = apSelect.value;
+    sync();
     explain(params.aperture);
     onChange();
   });
@@ -76,7 +81,7 @@ export function createControls(panel, { onChange }) {
     const out = document.createElement("output");
     input.addEventListener("input", () => {
       params[key] = Number(input.value);
-      out.value = format(params[key]);
+      show(out, format(params[key]));
       explain(key);
       onChange();
     });
@@ -121,7 +126,25 @@ export function createControls(panel, { onChange }) {
     sync();
     explain(params.view);
   });
-  buttons.append(view);
+  // Whether the beam comes the usual way, making real images, or reversed,
+  // making virtual ones; lit up while virtual.
+  const reverse = document.createElement("button");
+  reverse.addEventListener("click", () => {
+    params.reversed = !params.reversed;
+    sync();
+    explain("reversed");
+    onChange();
+  });
+  // With both plates of a stacked hologram lit, which one the eye looks
+  // through.
+  const eye = document.createElement("button");
+  eye.addEventListener("click", () => {
+    params.eyeHalf = -params.eyeHalf;
+    sync();
+    explain("eyeHalf");
+    onChange();
+  });
+  buttons.append(view, reverse, eye);
   group.append(buttons);
 
   // Makes every control show what params holds.
@@ -129,9 +152,14 @@ export function createControls(panel, { onChange }) {
     apSelect.value = params.aperture;
     for (const [key, s] of Object.entries(sliders)) {
       s.input.value = params[key];
-      s.out.value = s.format(params[key]);
+      show(s.out, s.format(params[key]));
     }
     view.textContent = params.view === "cross" ? "Full View" : "Cross Section";
+    reverse.textContent = params.reversed ? "Virtual" : "Real";
+    reverse.setAttribute("aria-pressed", params.reversed);
+    eye.textContent = params.eyeHalf > 0 ? "Eye ▲" : "Eye ▼";
+    eye.title = `The eye looks through the ${params.eyeHalf > 0 ? "top" : "bottom"} plate`;
+    eye.hidden = !params.reversed || params.aperture !== "stack";
   }
 
   // The tour: back and next arrows with the step number between them.
@@ -193,6 +221,13 @@ export function createControls(panel, { onChange }) {
   goTo(0, { initial: true });
 
   return { params };
+}
+
+// Sets a slider's readout. The infinity sign is set larger, so it reads
+// as clearly as the numbers.
+function show(out, text) {
+  out.value = text;
+  out.classList.toggle("infinite", text === "∞");
 }
 
 function row(parent, label) {

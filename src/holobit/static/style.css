@@ -111,6 +111,11 @@ aside {
   font-variant-numeric: tabular-nums;
 }
 
+.row output.infinite {
+  font-size: 22px;
+  line-height: 14px;
+}
+
 .buttons {
   display: flex;
   gap: 8px;
@@ -124,6 +129,12 @@ select {
   border: 1px solid #2c3446;
   border-radius: 4px;
   padding: 3px 8px;
+}
+
+/* A toggle button that is on. */
+button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* The tour's back and next arrows, at the far right of the toolbar. */

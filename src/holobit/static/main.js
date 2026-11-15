@@ -17,7 +17,9 @@ import { geometry } from "./physics/layout.js";
 import { FIELD_SHADER, SCREEN_SHADER, SCREEN_STEP } from "./physics/wavefield.js";
 import { createControls } from "./ui/controls.js";
 import {
+  eyePlace,
   FIELD_ROW_MAX_SHADER,
+  ghost,
   phaseStep,
   SCREEN_COLOR_SHADER,
   SLICE_COLOR_SHADER,
@@ -94,6 +96,9 @@ const sliceColorRT = colorTarget(g.W + g.stripW, g.H);
 // The brightest light in each row of the cross section beyond the plate.
 const fieldRowMaxRT = floatTarget(1, g.H);
 const screenColorRT = colorTarget(S, S);
+// The image the eye's lens casts on its retina, with the beam reversed:
+// the virtual image on the screen, in the light's color, as real light.
+const retinaColorRT = colorTarget(S, S);
 
 // Per row of the aperture line: [kind, block, depth, 0].
 const rowsData = new Float32Array(g.H * 4);
@@ -126,6 +131,10 @@ const U = {
   uHue: { value: new THREE.Vector3() },
   uMaxIntensity: { value: 1e-9 },
   uFieldMax: { value: 1 },
+  uReversed: { value: false },
+  uGhost: { value: 1 },
+  uEyeY: { value: 0 },
+  uFlatTop: { value: false },
 };
 const uPhase = { value: new THREE.Vector2(1, 0) };
 const uStrip = { value: 1 };
@@ -143,7 +152,8 @@ function pass(fragmentShader, uniforms) {
 
 const fieldPass = pass(FIELD_SHADER, { ...U, uMirror: { value: true } });
 const screenPass = pass(SCREEN_SHADER, { ...U, uMirror: { value: false }, uScreenX: { value: g.screenX } });
-const screenColorPass = pass(SCREEN_COLOR_SHADER, U);
+const screenColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uFade: { value: 1 } });
+const retinaColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uReversed: { value: false }, uFade: U.uGhost });
 const fieldRowMaxPass = pass(FIELD_ROW_MAX_SHADER, { ...U, uField: { value: fieldRT.texture } });
 const sliceColorPass = pass(SLICE_COLOR_SHADER, {
   ...U,
@@ -175,7 +185,12 @@ function runPass(material, target, row, rows) {
 
 // ---- Computing the light ----------------------------------------------------
 
-const { scene, camera, layout, drawAperture } = createScene(g, sliceColorRT.texture, screenColorRT.texture);
+const { scene, camera, layout, drawAperture, placeRetina } = createScene(
+  g,
+  sliceColorRT.texture,
+  screenColorRT.texture,
+  retinaColorRT.texture,
+);
 const readBack = new Float32Array(S * S * 4);
 // The brightest point of each row of the screen, as computed, so the
 // screen can be scaled to the brightest point it shows while it fills in.
@@ -186,7 +201,9 @@ let job = null;
 
 // Starts recomputing the light for the current settings.
 function startCompute() {
-  g = geometry(params);
+  // A reversed beam is worked out as the mirror image of the beam at the
+  // opposite angle (see wavefield.js).
+  g = geometry(params.reversed ? { ...params, angle: -params.angle } : params);
   const ap = aperture(params, g);
   for (let row = 0; row < g.H; row++) {
     rowsData.set([ap.kind[row], ap.block[row], ap.depth[row], 0], row * 4);
@@ -205,18 +222,26 @@ function startCompute() {
   U.uBeamGap.value = ap.beamGap;
   U.uK.value = g.k;
   U.uCurvature.value = g.curvature;
-  U.uApertureHalf.value = g.apertureSize / 2;
+  U.uApertureHalf.value = ap.beamHalf;
+  U.uFlatTop.value = ap.flatTop;
   U.uBeamDir.value.set(...g.beamDir);
   U.uSourceX.value = g.sourceX;
   U.uSourceY.value = g.sourceY;
   U.uHue.value.set(...wavelengthColor(params.wavelength).map((c) => c / 255));
   drawAperture(ap, g);
+  U.uReversed.value = params.reversed;
+  const eye = eyePlace(g, ap.seen);
+  U.uEyeY.value = eye.y;
+  placeRetina(params.reversed ? eye : null);
 
   // How many wavelet sums each pixel needs: one per slit row, or one per
   // point of a hologram's grid, only half of them in the cross section.
+  // With the beam reversed, the columns before the plate need them, and
+  // for a hologram, its virtual light beyond the plate and on the screen;
+  // otherwise the screen gets no light, which takes no summing.
   const { rows, cols } = ap.plate ?? {};
   const fieldCost = ap.plate ? (rows * (cols + 1)) / 2 : ap.count;
-  const screenCost = ap.plate ? rows * cols : ap.count;
+  const screenCost = ap.plate ? rows * cols : params.reversed ? 1 : ap.count;
   job = { fieldRow: 0, screenRow: 0, fieldCost, screenCost };
 }
 
@@ -305,6 +330,12 @@ function frame(now) {
   uPhase.value.set(Math.cos(phase), Math.sin(phase));
   resize();
   uStrip.value = 1 - layout(viewT);
+  // Virtual light fades in and out, on the screen too.
+  U.uGhost.value = ghost(now / 1000);
+  if (U.uReversed.value) {
+    runPass(screenColorPass, screenColorRT);
+    runPass(retinaColorPass, retinaColorRT);
+  }
   runPass(sliceColorPass, sliceColorRT);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);

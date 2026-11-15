@@ -5,7 +5,7 @@
 // lines into plates.
 
 import * as THREE from "three";
-import { ROW_OPEN, shade } from "../physics/aperture.js";
+import { ROW_HOLOGRAM, ROW_OPEN, shade } from "../physics/aperture.js";
 import { BG, GLASS, WALL } from "./display.js";
 
 const FOV = 30;
@@ -19,7 +19,7 @@ const UNIT = 1 / 100;
 // face-on picture. Returns the scene and camera, layout(t) to place them
 // part way between the views, and drawAperture(ap, g) to repaint the
 // aperture plate.
-export function createScene(g, sliceTexture, screenTexture) {
+export function createScene(g, sliceTexture, screenTexture, retinaTexture) {
   const totalW = g.W + g.stripW;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(...BG.map((c) => c / 255));
@@ -82,12 +82,15 @@ export function createScene(g, sliceTexture, screenTexture) {
 
   // Paints the aperture plate face on: wall, and either full-width slits
   // (the sine grating's shaded by how much they block), or a bleached
-  // hologram, clear, shaded by how much it delays the light.
+  // hologram, clear, shaded by how much it delays the light (a stacked one
+  // in two plates, with a gap between them).
   function drawAperture(ap, g) {
     const A = g.apertureSize;
     const T = ap.height;
     aperturePlate.size = A;
     aperturePlate.mesh.scale.y = T;
+    aperturePlate.edges.geometry.dispose();
+    aperturePlate.edges.geometry = outline(ap.gap / T);
     // The canvas's top-left corner; textures run bottom up.
     apertureTexture.repeat.set(A / M, T / (2 * M));
     apertureTexture.offset.set(0, 1 - T / (2 * M));
@@ -99,7 +102,10 @@ export function createScene(g, sliceTexture, screenTexture) {
       for (let cx = 0; cx < A; cx++) {
         let color = WALL;
         let alpha = 110;
-        if (ap.plate) {
+        if (ap.plate && ap.kind[row] !== ROW_HOLOGRAM) {
+          // The gap between a stacked plate's halves.
+          alpha = 0;
+        } else if (ap.plate) {
           const value = shade(ap.plate, cx - A / 2 + 0.5, row - g.centerY);
           color = GLASS.map((c) => c * (0.45 + 0.55 * value));
           alpha = 120;
@@ -111,6 +117,47 @@ export function createScene(g, sliceTexture, screenTexture) {
     }
     ctx.putImageData(img, 0, 0);
     apertureTexture.needsUpdate = true;
+  }
+
+  // The outline of the aperture plate, in the plate's own units (one
+  // across), split in two around a gap `gap` of its height across the
+  // middle: the two plates of a stacked hologram.
+  function outline(gap) {
+    const [h, m] = [UNIT / 2, (gap * UNIT) / 2];
+    const rects = gap > 0 ? [[m, h], [-h, -m]] : [[-h, h]];
+    const points = rects.flatMap(([lo, hi]) =>
+      [[-h, lo], [h, lo], [h, lo], [h, hi], [h, hi], [-h, hi], [-h, hi], [-h, lo]].map(([x, y]) => [x, y, 0]),
+    );
+    return new THREE.BufferGeometry().setFromPoints(points.map((p) => new THREE.Vector3(...p)));
+  }
+
+  // The eye's retina, with the beam reversed: a small plate at the back of
+  // the eye drawn in the cross section, facing its lens, showing the image
+  // the lens casts there, upside down (turned half around in its own
+  // plane) and to scale (see eyePlace in display.js). Black is clear.
+  const retina = new THREE.Mesh(
+    new THREE.PlaneGeometry(UNIT, UNIT),
+    new THREE.MeshBasicMaterial({
+      map: retinaTexture,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  retina.rotation.set(0, Math.PI / 2, Math.PI);
+  retina.visible = false;
+  scene.add(retina);
+  let retinaSize = 0;
+
+  // Places the retina for the eye at `eye` (see eyePlace), or hides it.
+  function placeRetina(eye) {
+    retina.visible = eye !== null;
+    if (!eye) return;
+    retinaSize = g.H * eye.shrink;
+    retina.position.set((eye.retinaX - totalW / 2) * UNIT, eye.y * (1 + eye.shrink) * UNIT, 0);
+    retina.scale.y = retinaSize;
   }
 
   // Places the camera and plates part way between the cross section
@@ -145,8 +192,10 @@ export function createScene(g, sliceTexture, screenTexture) {
       mesh.material.opacity = e;
       edges.material.opacity = 0.8 * e;
     }
+    retina.scale.x = Math.max(e, 1e-4) * retinaSize;
+    retina.material.opacity = e;
     return e;
   }
 
-  return { scene, camera, layout, drawAperture };
+  return { scene, camera, layout, drawAperture, placeRetina };
 }

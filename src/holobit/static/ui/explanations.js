@@ -48,8 +48,14 @@ export const EXPLANATIONS = {
     "A hologram of the outline of a circle, recorded like the square: worked out from the light " +
     "of every point of it. Lit again, it rebuilds the circle on the screen.",
   stack:
-    "Two holograms on one plate: the square on the top half, the circle on the bottom half, " +
-    "both landing in the same place on the screen. Lit all over, the plate shows both at once.",
+    "Two holograms, stacked: the square on the top plate, the circle on the bottom one, both " +
+    "landing in the same place on the screen, and one wide beam lighting both. As real images " +
+    "they show at once; as virtual images, an eye sees only the one on the plate it looks " +
+    "through.",
+  eyeHalf:
+    "The eye moves to look through the other plate. Light from each plate heads off in its own " +
+    "direction, so the eye sees only the picture on the plate it looks through: move it, and " +
+    "the picture changes.",
   stackSquare:
     "Two holograms on one plate, with only the top half lit: only the square, recorded there, " +
     "appears. The parts of a plate can each hold a different picture.",
@@ -85,6 +91,15 @@ export const EXPLANATIONS = {
         "off-axis holography: with the reference beam at an angle, the image comes out in a " +
         "different direction from the leftover light. At 45 degrees the grating's first order " +
         "comes straight out.",
+
+  // Reversing the beam.
+  reversed: (params) =>
+    params.reversed
+      ? "The beam now comes from the screen's side, travelling back the way it went. A hologram " +
+        "lit by its reference beam reversed sends its light back too: light that converged on " +
+        "a point now spreads back out as if from that point. That virtual light, which only " +
+        "seems to be there, is drawn in white, on the screen too."
+      : "The beam comes from the source's side again.",
 
   // Views.
   full:

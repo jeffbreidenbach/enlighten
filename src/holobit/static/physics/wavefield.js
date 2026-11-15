@@ -21,6 +21,18 @@
 //                  a hologram's grid
 //   uPlate, uPlateRows, uPlateCols, uPlateStep, uMirror
 //                  a hologram's grid (see plateSum)
+//   uReversed      whether the light comes from the screen's side instead
+//
+// Light from the screen's side, the beam reversed, is the mirror image of
+// light from the source's side arriving at the opposite angle (which
+// main.js hands over): so it is worked out that way, and the cross
+// section mirrored about the plate. The light leaving the plate then
+// heads away from the screen, and none reaches it. A hologram's image
+// light, though, now seems to come from the screen's side: from its
+// image, a virtual one. That virtual light is the image light the beam
+// the right way round would send there, running backwards: its
+// conjugate. It is worked out alongside, from the image's light on the
+// plate (see plateGrid in aperture.js).
 
 import { float, HEAD } from "../glsl.js";
 import { MODE_PLATE, ROW_HOLOGRAM, ROW_OPEN } from "./aperture.js";
@@ -31,7 +43,7 @@ const WAVEFIELD = `
 uniform float uK, uCurvature, uApertureX, uWallHalf, uApertureHalf, uCenterY;
 uniform int uMode, uWaveletCount, uPlateRows, uPlateCols;
 uniform float uPlateStep;
-uniform bool uMirror;
+uniform bool uMirror, uReversed;
 uniform vec2 uBeamDir;
 uniform sampler2D uRows, uWavelets, uPlate;
 
@@ -83,8 +95,8 @@ vec2 slitRow(vec4 w, float dx, vec2 p) {
 // (uPlate, uPlateRows by uPlateCols points, uPlateStep apart, centered on the
 // plate). Every hologram is the same on either side of the cross
 // section, so in it (uMirror) each point out of it stands in for its
-// mirror image too.
-vec2 plateSum(float dx, vec2 p) {
+// mirror image too. With image, it sums the image's light alone instead.
+vec2 plateSum(float dx, vec2 p, bool image) {
   int rowMid = (uPlateRows - 1) / 2;
   int mid = (uPlateCols - 1) / 2;
   int first = uMirror ? mid : 0;
@@ -95,7 +107,8 @@ vec2 plateSum(float dx, vec2 p) {
     for (int j = first; j < uPlateCols; j++) {
       float dz = p.x - float(j - mid) * uPlateStep;
       float r = sqrt(across2 + dz * dz);
-      vec2 w = cmul(texelFetch(uPlate, ivec2(j, i), 0).xy, wavelet(r, dx));
+      vec4 point = texelFetch(uPlate, ivec2(j, i), 0);
+      vec2 w = cmul(image ? point.zw : point.xy, wavelet(r, dx));
       sum += uMirror && j > mid ? 2.0 * w : w;
     }
   }
@@ -112,12 +125,19 @@ vec2 lightAt(float x, vec2 p) {
 
   // After the plate, it is the sum of the wavelets.
   float dx = x - uApertureX;
-  if (uMode == ${MODE_PLATE}) return plateSum(dx, p);
+  if (uMode == ${MODE_PLATE}) return plateSum(dx, p, false);
   vec2 u = vec2(0.0);
   for (int i = 0; i < uWaveletCount; i++) {
     u += slitRow(texelFetch(uWavelets, ivec2(i, 0), 0), dx, p);
   }
   return u;
+}
+
+// The virtual light at x beyond the plate, with the beam reversed.
+vec2 virtualAt(float x, vec2 p) {
+  if (uMode != ${MODE_PLATE} || x <= uApertureX + uWallHalf) return vec2(0.0);
+  vec2 u = plateSum(x - uApertureX, p, true);
+  return vec2(u.x, -u.y);
 }`;
 
 // The screen is computed at every SCREEN_STEP grid cells, half the
@@ -125,15 +145,19 @@ vec2 lightAt(float x, vec2 p) {
 // patterns, the holograms' spots included, are far wider than that.
 export const SCREEN_STEP = 2;
 
-// The cross section: R, G = the light's complex amplitude.
+// The cross section: R, G = the light's complex amplitude; B, A = the
+// virtual light's, with the beam reversed.
 export const FIELD_SHADER = `${HEAD}${WAVEFIELD}
 out vec4 outColor;
 void main() {
   vec2 c = floor(gl_FragCoord.xy);
-  outColor = vec4(lightAt(c.x, vec2(0.0, c.y - uCenterY)), 0.0, 0.0);
+  vec2 p = vec2(0.0, c.y - uCenterY);
+  if (uReversed) outColor = vec4(lightAt(2.0 * uApertureX - c.x, p), virtualAt(c.x, p));
+  else outColor = vec4(lightAt(c.x, p), 0.0, 0.0);
 }`;
 
-// The screen plate, seen face on: R, G = complex amplitude, B = intensity.
+// The screen plate, seen face on: R, G = complex amplitude, B = intensity;
+// with the beam reversed, of the virtual light.
 // Each pixel is the light at the middle of the SCREEN_STEP grid cells it
 // covers. Full-width slits give the same light all the
 // way across, so only the height matters for them.
@@ -142,6 +166,8 @@ uniform float uScreenX;
 out vec4 outColor;
 void main() {
   vec2 p = (floor(gl_FragCoord.xy) + 0.5) * ${float(SCREEN_STEP)} - 0.5 - uCenterY;
-  vec2 u = lightAt(uScreenX, uMode == ${MODE_PLATE} ? p : vec2(0.0, p.y));
+  vec2 u = uReversed
+    ? virtualAt(uScreenX, p)
+    : lightAt(uScreenX, uMode == ${MODE_PLATE} ? p : vec2(0.0, p.y));
   outColor = vec4(u, dot(u, u), 0.0);
 }`;
