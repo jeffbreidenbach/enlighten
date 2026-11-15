@@ -101,7 +101,8 @@ export function geometry(params) {
     maxApertureSize: MAX_PLATE * scale,
     wallHalf: scale,
 
-    // The screen, in the middle of the strip.
+    // The screen, in the middle of the strip. The cross section's waves
+    // are worked out all the way up to it.
     screenX: W + stripW / 2 + scale,
   };
 }

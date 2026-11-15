@@ -79,37 +79,39 @@ export const TOUR = [
       "to off-axis holography.",
   },
   {
-    set: { angle: 0 },
+    set: { aperture: "point" },
     text:
-      "Straighten the beam again, and the orders spread out evenly on either side of the light " +
-      "going straight through.",
-  },
-  {
-    set: { aperture: "lens" },
-    text:
-      "A Fresnel lens is rings of fringes that bend every part of the wave toward one spot. This " +
-      "one is off center, so it acts like a grating and a lens at once, steering the plane wave up " +
-      "to a bright spot on the screen. It is the hologram of a single point: light it, and it " +
-      "recreates that point.",
+      "Now curve the grating's fringes, the way a point's light records them with this 45-degree " +
+      "reference beam: a hologram of a single point, bleached clear so its fringes delay the " +
+      "light instead of blocking it. The light it bends straight ahead now also converges, to a " +
+      "small, bright spot on the screen; the leftover light carries on at 45 degrees and misses " +
+      "the screen. Light the hologram, and it recreates the point.",
   },
   {
     set: { view: "full" },
     text:
-      "From the side, the light bends up and converges from the lens to a bright spot on the " +
-      "screen. A hologram of a whole object is the sum of such lenses, one for every point of the " +
-      "object.",
+      "From the side, the light bends level and converges from the hologram to a bright spot on " +
+      "the screen, while the leftover light heads off at 45 degrees. A hologram of a whole " +
+      "object records every point of it at once.",
   },
   {
-    set: { aperture: "lens2" },
+    set: { aperture: "point2" },
     text:
-      "Two lenses on one plate focus light to two points at once. Add enough points and you have " +
-      "an image. A holographic stereogram builds its image from many small holograms, each showing " +
-      "the scene from a different viewpoint.",
+      "Record two points on one plate, and it focuses light to both at once. Add enough points " +
+      "and you have an image. A holographic stereogram builds its image from many small " +
+      "holograms, each showing the scene from a different viewpoint.",
   },
   {
     set: { plate: 160 },
     text:
-      "Double the size of the plate. With twice as much of each lens lit, the spots shrink to " +
+      "Double the size of the plate. With twice as much of the hologram lit, the spots shrink to " +
       "half the size: the bigger the hologram, the sharper the image it can make.",
+  },
+  {
+    set: { aperture: "square" },
+    text:
+      "Now a whole shape: a hologram of the outline of a square, worked out from the square " +
+      "itself. The light of every point of the outline meets the reference beam on the film, " +
+      "and the film records it all at once. Lit again, it rebuilds the square on the screen.",
   },
 ];

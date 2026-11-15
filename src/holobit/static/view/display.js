@@ -2,7 +2,7 @@
 // light into pixels.
 
 import { float, HEAD, vec3 } from "../glsl.js";
-import { BEAM_FALLOFF, ROW_LENS, ROW_OPEN, ROW_WALL } from "../physics/aperture.js";
+import { BEAM_FALLOFF, ROW_HOLOGRAM, ROW_OPEN, ROW_WALL } from "../physics/aperture.js";
 import { SCREEN_STEP } from "../physics/wavefield.js";
 
 export const BG = [6, 8, 14];
@@ -106,12 +106,12 @@ void main() {
   vec2 c = floor(gl_FragCoord.xy);
   vec3 rgb = vec3(0.0);
   if (c.x < uWidth) {
-    // The plate: wall, lens glass, or a sine grating row drawn as wall in
+    // The plate: wall, hologram, or a sine grating row drawn as wall in
     // proportion to how much it blocks.
     vec4 row = texelFetch(uRows, ivec2(int(c.y), 0), 0);
     float kind = row.x;
     bool partial = kind == ${float(ROW_OPEN)} && row.y > 0.01;
-    bool solid = kind == ${float(ROW_WALL)} || kind == ${float(ROW_LENS)} || partial;
+    bool solid = kind == ${float(ROW_WALL)} || kind == ${float(ROW_HOLOGRAM)} || partial;
     if (abs(c.x - uApertureX) <= uWallHalf && solid) {
       rgb = kind == ${float(ROW_WALL)} ? ${vec3(WALL)}
           : partial ? ${vec3(WALL)} * row.y
@@ -130,9 +130,10 @@ void main() {
       float shade = 0.5 + 0.5 * dot(u, uPhase) / max(strength, 1e-6);
       rgb = uHue * shade * min(strength / uFieldMax, 1.0) * beam(c);
     }
-  } else if (c.x >= uWidth + 2.0 * uScale) {
-    // The screen strip: the center line of the screen plate, which is
-    // computed more coarsely, so blended between its nearest two rows.
+  } else {
+    // The screen strip, from the screen on: the center line of the screen
+    // plate, which is computed more coarsely, so blended between its
+    // nearest two rows.
     float at = (c.y + 0.5) / STEP - 0.5;
     int column = int(uCenterY / STEP);
     int below = int(floor(at));

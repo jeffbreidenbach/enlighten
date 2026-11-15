@@ -5,7 +5,7 @@
 // lines into plates.
 
 import * as THREE from "three";
-import { lensGroove, ROW_OPEN } from "../physics/aperture.js";
+import { ROW_OPEN, shade } from "../physics/aperture.js";
 import { BG, GLASS, WALL } from "./display.js";
 
 const FOV = 30;
@@ -80,8 +80,8 @@ export function createScene(g, sliceTexture, screenTexture) {
   const plates = [aperturePlate, makePlate(g.screenX, screenTexture, g.H)];
 
   // Paints the aperture plate face on: wall, and either full-width slits
-  // (the sine grating's shaded by how much they block) or round lenses
-  // shaded by their grooves (averaged where two overlap).
+  // (the sine grating's shaded by how much they block), or a bleached
+  // hologram, clear, shaded by how much it delays the light.
   function drawAperture(ap, g) {
     const A = g.apertureSize;
     aperturePlate.size = A;
@@ -97,19 +97,10 @@ export function createScene(g, sliceTexture, screenTexture) {
       for (let cx = 0; cx < A; cx++) {
         let color = WALL;
         let alpha = 110;
-        if (ap.lens) {
-          let shade = 0;
-          let covering = 0;
-          for (const center of ap.lens.centers) {
-            const rho = Math.hypot(cx - A / 2, row - g.centerY - center);
-            if (rho > ap.lens.radius) continue;
-            shade += 0.45 + 0.55 * lensGroove(g, rho);
-            covering += 1;
-          }
-          if (covering > 0) {
-            color = GLASS.map((c) => (c * shade) / covering);
-            alpha = 120;
-          }
+        if (ap.plate) {
+          const value = shade(ap.plate, cx - A / 2 + 0.5, row - g.centerY);
+          color = GLASS.map((c) => c * (0.45 + 0.55 * value));
+          alpha = 120;
         } else if (ap.kind[row] === ROW_OPEN) {
           alpha *= ap.block[row];
         }

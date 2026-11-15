@@ -27,7 +27,7 @@ import { createScene } from "./view/scene.js";
 
 // Seconds the switch between views takes.
 const TRANSITION = 1.6;
-// Wavelet sums to do per drawn frame. A heavy case (the lenses) is spread
+// Wavelet sums to do per drawn frame. A heavy case (the holograms) is spread
 // over several frames, so it never freezes the page or trips the GPU's
 // watchdog; the previous picture stays up meanwhile.
 const SUMS_PER_FRAME = 2e8;
@@ -76,9 +76,10 @@ function colorTarget(w, h) {
   });
 }
 
-// A row of RGBA floats as a texture, for the shaders to look up.
-function dataTexture(data) {
-  const tex = new THREE.DataTexture(data, data.length / 4, 1, THREE.RGBAFormat, THREE.FloatType);
+// RGBA floats as a texture, a row of them unless given a width, for the
+// shaders to look up.
+function dataTexture(data, width = data.length / 4) {
+  const tex = new THREE.DataTexture(data, width, data.length / 4 / width, THREE.RGBAFormat, THREE.FloatType);
   tex.needsUpdate = true;
   return tex;
 }
@@ -86,7 +87,7 @@ function dataTexture(data) {
 // The computed light: the cross section, and the screen face on, more
 // coarsely.
 const S = g.H / SCREEN_STEP;
-const fieldRT = floatTarget(g.W, g.H);
+const fieldRT = floatTarget(g.screenX, g.H);
 const screenRT = floatTarget(S, S);
 // What is drawn from it.
 const sliceColorRT = colorTarget(g.W + g.stripW, g.H);
@@ -94,7 +95,7 @@ const sliceColorRT = colorTarget(g.W + g.stripW, g.H);
 const fieldRowMaxRT = floatTarget(1, g.H);
 const screenColorRT = colorTarget(S, S);
 
-// Per row of the aperture line: [kind, block, groove, 0].
+// Per row of the aperture line: [kind, block, depth, 0].
 const rowsData = new Float32Array(g.H * 4);
 const rowsTex = dataTexture(rowsData);
 
@@ -114,6 +115,9 @@ const U = {
   uRows: { value: rowsTex },
   uWavelets: { value: null },
   uWaveletCount: { value: 0 },
+  uPlate: { value: null },
+  uPlateN: { value: 0 },
+  uPlateStep: { value: 1 },
   uMode: { value: 0 },
   uScreen: { value: screenRT.texture },
   uHue: { value: new THREE.Vector3() },
@@ -134,8 +138,8 @@ function pass(fragmentShader, uniforms) {
   });
 }
 
-const fieldPass = pass(FIELD_SHADER, U);
-const screenPass = pass(SCREEN_SHADER, { ...U, uScreenX: { value: g.screenX } });
+const fieldPass = pass(FIELD_SHADER, { ...U, uMirror: { value: true } });
+const screenPass = pass(SCREEN_SHADER, { ...U, uMirror: { value: false }, uScreenX: { value: g.screenX } });
 const screenColorPass = pass(SCREEN_COLOR_SHADER, U);
 const fieldRowMaxPass = pass(FIELD_ROW_MAX_SHADER, { ...U, uField: { value: fieldRT.texture } });
 const sliceColorPass = pass(SLICE_COLOR_SHADER, {
@@ -143,7 +147,7 @@ const sliceColorPass = pass(SLICE_COLOR_SHADER, {
   uField: { value: fieldRT.texture },
   uPhase,
   uStrip,
-  uWidth: { value: g.W },
+  uWidth: { value: g.screenX },
   uScale: { value: g.scale },
 });
 
@@ -182,12 +186,16 @@ function startCompute() {
   g = geometry(params);
   const ap = aperture(params, g);
   for (let row = 0; row < g.H; row++) {
-    rowsData.set([ap.kind[row], ap.block[row], ap.groove[row], 0], row * 4);
+    rowsData.set([ap.kind[row], ap.block[row], ap.depth[row], 0], row * 4);
   }
   rowsTex.needsUpdate = true;
   U.uWavelets.value?.dispose();
   U.uWavelets.value = dataTexture(ap.wavelets);
   U.uWaveletCount.value = ap.count;
+  U.uPlate.value?.dispose();
+  U.uPlate.value = ap.plate ? dataTexture(ap.plate.data, ap.plate.n) : dataTexture(new Float32Array(4));
+  U.uPlateN.value = ap.plate?.n ?? 0;
+  U.uPlateStep.value = ap.plate?.step ?? 1;
   U.uMode.value = ap.mode;
   U.uK.value = g.k;
   U.uCurvature.value = g.curvature;
@@ -198,39 +206,37 @@ function startCompute() {
   U.uHue.value.set(...wavelengthColor(params.wavelength).map((c) => c / 255));
   drawAperture(ap, g);
 
-  // Roughly how many wavelet sums each pixel needs: one per slit row, or
-  // for the lenses one per point averaged around each ring.
-  const perPixel = ap.lens
-    ? ap.count * (8 + 0.4 * g.k * ap.lens.radius + (2 * ap.lens.radius) / (g.apertureSize / 2))
-    : ap.count;
-  job = { fieldRow: 0, screenRow: 0, perPixel };
+  // How many wavelet sums each pixel needs: one per slit row, or one per
+  // point of a hologram's grid, only half of them in the cross section.
+  const n = ap.plate?.n;
+  const fieldCost = ap.plate ? (n * (n + 1)) / 2 : ap.count;
+  const screenCost = ap.plate ? n * n : ap.count;
+  job = { fieldRow: 0, screenRow: 0, fieldCost, screenCost };
 }
 
 // Does one frame's share of the calculation. The cross section and the
-// screen share the frame's budget in proportion to their size, so they
+// screen share the frame's budget in proportion to their work, so they
 // fill in together; whatever one leaves, the other takes.
 function continueCompute() {
   let budget = SUMS_PER_FRAME;
-  // Computes rows of target from row done on, using up to `share` sums.
-  // Returns the row reached.
-  const band = (material, target, done, share) => {
-    const rows = Math.min(
-      target.height - done,
-      Math.max(1, Math.floor(share / (target.width * job.perPixel))),
-    );
+  // Computes rows of target from row done on, using up to `share` sums,
+  // at `cost` sums a pixel. Returns the row reached.
+  const band = (material, target, done, share, cost) => {
+    const rows = Math.min(target.height - done, Math.max(1, Math.floor(share / (target.width * cost))));
     runPass(material, target, done, rows);
-    budget -= rows * target.width * job.perPixel;
+    budget -= rows * target.width * cost;
     return done + rows;
   };
   const screenStart = job.screenRow;
   const fieldStart = job.fieldRow;
-  const screenShare = (budget * S * S) / (g.W * g.H + S * S);
-  if (job.screenRow < S) job.screenRow = band(screenPass, screenRT, job.screenRow, screenShare);
+  const screenWork = S * S * job.screenCost;
+  const screenShare = (budget * screenWork) / (g.screenX * g.H * job.fieldCost + screenWork);
+  if (job.screenRow < S) job.screenRow = band(screenPass, screenRT, job.screenRow, screenShare, job.screenCost);
   while (budget > 0 && job.fieldRow < g.H) {
-    job.fieldRow = band(fieldPass, fieldRT, job.fieldRow, budget);
+    job.fieldRow = band(fieldPass, fieldRT, job.fieldRow, budget, job.fieldCost);
   }
   while (budget > 0 && job.screenRow < S) {
-    job.screenRow = band(screenPass, screenRT, job.screenRow, budget);
+    job.screenRow = band(screenPass, screenRT, job.screenRow, budget, job.screenCost);
   }
 
   // Read back the screen's new rows, and redraw it scaled to the

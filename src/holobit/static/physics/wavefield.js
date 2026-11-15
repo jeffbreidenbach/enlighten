@@ -18,18 +18,22 @@
 //   uRows          what each row of the aperture line is (aperture.js)
 //   uWavelets, uWaveletCount, uMode
 //                  the wavelets to sum, and whether they are slit rows or
-//                  lens rings
+//                  a hologram's grid
+//   uPlate, uPlateN, uPlateStep, uMirror
+//                  a hologram's grid (see plateSum)
 
 import { float, HEAD } from "../glsl.js";
-import { BEAM_FALLOFF, MODE_LENS, ROW_LENS, ROW_OPEN } from "./aperture.js";
+import { MODE_PLATE, ROW_HOLOGRAM, ROW_OPEN } from "./aperture.js";
 
 // The light at a point x along the axis and p across it, where p.y is the
 // height above the axis and p.x the distance out of the cross section.
 const WAVEFIELD = `
 uniform float uK, uCurvature, uApertureX, uWallHalf, uApertureHalf, uCenterY;
-uniform int uMode, uWaveletCount;
+uniform int uMode, uWaveletCount, uPlateN;
+uniform float uPlateStep;
+uniform bool uMirror;
 uniform vec2 uBeamDir;
-uniform sampler2D uRows, uWavelets;
+uniform sampler2D uRows, uWavelets, uPlate;
 
 const float TAU = 6.28318531;
 
@@ -64,12 +68,6 @@ vec2 incident(float x, vec2 p) {
   return wave((2.0 * along + c * dot(q, q)) / (1.0 + m)) / max(m, 0.5 * c);
 }
 
-// The beam's soft edge (BEAM_FALLOFF in aperture.js), at point q of the
-// plate measured from its center.
-float beamProfile(vec2 q) {
-  return exp(-${float(BEAM_FALLOFF)} * dot(q, q) / (uApertureHalf * uApertureHalf));
-}
-
 // A full-width slit row at height rowY, where the arriving light has
 // curvature 1 / R, R its distance from the source. Summing its wavelets
 // along the row (in closed form) leaves one wavelet whose strength fades
@@ -81,58 +79,49 @@ vec2 slitRow(vec4 w, float dx, vec2 p) {
   return spread * cmul(w.yz, wavelet(r, dx));
 }
 
-// A ring of radius rho of a lens centered at height centerY, summed by
-// averaging over points around it. At angle phi a point of the ring sits
-// rho cos(phi) out of the cross section and rho sin(phi) above the lens's
-// center. pc is the point measured from that center.
-vec2 lensRing(vec4 w, float dx, vec2 p) {
-  float rho = w.x;
-  float centerY = w.w;
-  vec2 pc = p - vec2(0.0, centerY);
-  float toP2 = dx * dx + dot(pc, pc) + rho * rho;
-  // The phase swings by about this much around the ring, so that many
-  // points, plus a margin, are enough for an accurate average. The beam
-  // lights the ring unevenly too, a bump about as wide as the beam, so a
-  // ring large next to the beam needs more points to follow it; without
-  // them, the focus itself comes out too dark. The
-  // arriving light's tilt across the ring is at most its tilt at the
-  // plate's center plus what its curvature adds.
-  float tilt = min(abs(uBeamDir.y) + uCurvature * (abs(centerY) + rho), 1.0);
-  float swing = uK * rho * (length(pc) / sqrt(toP2) + tilt);
-  int n = min(int(swing + 4.0 * rho / uApertureHalf) + 8, 256);
+// A hologram: the sum of the wavelets from the grid of points across it
+// (uPlate, uPlateN points on a side, uPlateStep apart, centered on the
+// plate). Every hologram is the same on either side of the cross
+// section, so in it (uMirror) each point out of it stands in for its
+// mirror image too.
+vec2 plateSum(float dx, vec2 p) {
+  int mid = (uPlateN - 1) / 2;
+  int first = uMirror ? mid : 0;
   vec2 sum = vec2(0.0);
-  for (int j = 0; j < n; j++) {
-    float phi = (float(j) + 0.5) * TAU / float(n);
-    vec2 q = rho * vec2(cos(phi), sin(phi));
-    vec2 onPlate = vec2(q.x, centerY + q.y);
-    vec2 arriving = beamProfile(onPlate) * incident(uApertureX, onPlate);
-    float r = sqrt(toP2 - 2.0 * dot(pc, q));
-    sum += cmul(arriving, wavelet(r, dx));
+  for (int i = 0; i < uPlateN; i++) {
+    float dy = p.y - float(i - mid) * uPlateStep;
+    float across2 = dx * dx + dy * dy;
+    for (int j = first; j < uPlateN; j++) {
+      float dz = p.x - float(j - mid) * uPlateStep;
+      float r = sqrt(across2 + dz * dz);
+      vec2 w = cmul(texelFetch(uPlate, ivec2(j, i), 0).xy, wavelet(r, dx));
+      sum += uMirror && j > mid ? 2.0 * w : w;
+    }
   }
-  return cmul(w.yz, sum / float(n));
+  return sum;
 }
 
 vec2 lightAt(float x, vec2 p) {
   // Before the plate, and in its openings, the light is the source's.
   bool inWall = abs(x - uApertureX) <= uWallHalf;
   float kind = inWall ? texelFetch(uRows, ivec2(int(p.y + uCenterY), 0), 0).x : 0.0;
-  bool open = kind == ${float(ROW_OPEN)} || kind == ${float(ROW_LENS)};
+  bool open = kind == ${float(ROW_OPEN)} || kind == ${float(ROW_HOLOGRAM)};
   if (x < uApertureX - uWallHalf || (inWall && open)) return incident(x, p);
   if (inWall) return vec2(0.0);
 
   // After the plate, it is the sum of the wavelets.
   float dx = x - uApertureX;
+  if (uMode == ${MODE_PLATE}) return plateSum(dx, p);
   vec2 u = vec2(0.0);
   for (int i = 0; i < uWaveletCount; i++) {
-    vec4 w = texelFetch(uWavelets, ivec2(i, 0), 0);
-    u += uMode == ${MODE_LENS} ? lensRing(w, dx, p) : slitRow(w, dx, p);
+    u += slitRow(texelFetch(uWavelets, ivec2(i, 0), 0), dx, p);
   }
   return u;
 }`;
 
 // The screen is computed at every SCREEN_STEP grid cells, half the
 // resolution of the cross section: a quarter of the work, and its
-// patterns, the lenses' spots included, are far wider than that.
+// patterns, the holograms' spots included, are far wider than that.
 export const SCREEN_STEP = 2;
 
 // The cross section: R, G = the light's complex amplitude.
@@ -152,6 +141,6 @@ uniform float uScreenX;
 out vec4 outColor;
 void main() {
   vec2 p = (floor(gl_FragCoord.xy) + 0.5) * ${float(SCREEN_STEP)} - 0.5 - uCenterY;
-  vec2 u = lightAt(uScreenX, uMode == ${MODE_LENS} ? p : vec2(0.0, p.y));
+  vec2 u = lightAt(uScreenX, uMode == ${MODE_PLATE} ? p : vec2(0.0, p.y));
   outColor = vec4(u, dot(u, u), 0.0);
 }`;
