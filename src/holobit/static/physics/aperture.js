@@ -134,6 +134,12 @@ const HOLOGRAMS = {
   stackCircle: { parts: STACKED, lit: -1, stacked: true },
 };
 
+// Whether an aperture is stacked plates both lit, so that the eye can look
+// through either.
+export function eyeCanMove(name) {
+  return Boolean(HOLOGRAMS[name]?.wide);
+}
+
 // How far bleaching delays the light where the film was darkest, in
 // radians: the depth that sends the most light into a point's image,
 // about a third of it.

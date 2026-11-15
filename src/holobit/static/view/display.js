@@ -20,6 +20,13 @@ export function ghost(t) {
   return (0.5 + 0.5 * Math.sin((2 * Math.PI * t) / GHOST_SECONDS)) ** 2;
 }
 
+// The eye fades with the virtual light, but stays fully drawn for the
+// third of each cycle the light is brightest, two seconds, so it can be
+// seen clearly.
+export function eyeFade(t) {
+  return Math.min(1, ghost(t) / 0.75 ** 2);
+}
+
 // With the beam reversed, an eye looks through the plate toward the
 // screen, from where the light leaving the plate heads: drawn side on in
 // white outline, fading in and out with the virtual light it sees. It
@@ -138,9 +145,9 @@ uniform float uStrip;
 // Whether the beam is reversed, coming from the screen's side: the light
 // is computed mirrored, so the source and beam are placed mirrored too,
 // and a hologram's virtual light is drawn over it in white, uGhost as
-// bright as it can be.
+// bright as it can be, and the eye uEyeFade as clearly drawn.
 uniform bool uReversed;
-uniform float uGhost;
+uniform float uGhost, uEyeFade;
 out vec4 outColor;
 
 // A wave as drawn: a smooth cosine at this moment's phase, brightest at
@@ -270,8 +277,8 @@ void main() {
     }
     if (uReversed) {
       vec2 e = eye(c);
-      rgb = mix(rgb, ${vec3(VIRTUAL)} * e.x, e.y * uGhost);
-      rgb = max(rgb, uHue * retina(c) * uGhost);
+      rgb = mix(rgb, ${vec3(VIRTUAL)} * e.x, e.y * uEyeFade);
+      rgb = max(rgb, uHue * retina(c) * uEyeFade);
     }
   } else {
     // The screen strip, from the screen on: the center line of the screen

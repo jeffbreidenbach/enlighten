@@ -81,11 +81,10 @@ export const TOUR = [
   {
     set: { aperture: "point" },
     text:
-      "Now curve the grating's fringes, the way a point's light records them with this 45-degree " +
-      "reference beam: a hologram of a single point, bleached clear so its fringes delay the " +
-      "light instead of blocking it. The light it bends straight ahead now also converges, to a " +
-      "small, bright spot on the screen; the leftover light carries on at 45 degrees and misses " +
-      "the screen. Light the hologram, and it recreates the point.",
+      "Now curve the grating's fringes, as a point's light records them with this reference " +
+      "beam: a hologram of a point, bleached clear. The light it bends straight ahead now " +
+      "converges to a small, bright spot on the screen, recreating the point; the leftover " +
+      "light carries on at 45 degrees.",
   },
   {
     set: { view: "full" },
@@ -137,11 +136,10 @@ export const TOUR = [
   {
     set: { reversed: true },
     text:
-      "Now reverse the beam: it comes from the screen's side, travelling back the way it went. " +
-      "The hologram sends its light back too, heading away from the screen, but spreading as " +
-      "if it came from the square on the screen. Drawn in white, fading in and out, is that " +
-      "light traced back to where it seems to come from: virtual light, which is not really " +
-      "there, and the square it seems to come from, a virtual image.",
+      "Now reverse the beam, so it comes from the screen's side. The hologram sends its light " +
+      "back too, spreading as if from the square on the screen. In fading white: that light " +
+      "traced back to where it seems to come from, which is not really there. The square is " +
+      "now a virtual image.",
   },
   {
     set: { aperture: "stackCircle" },

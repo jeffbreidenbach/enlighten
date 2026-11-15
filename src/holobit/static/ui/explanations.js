@@ -23,18 +23,15 @@ export const EXPLANATIONS = {
     "tilt the beam to 45 degrees and its first order comes straight out.",
   // Where a point hologram sends the light depends on the light.
   point: (params) =>
-    "A hologram of a point: the fringes the point's light made with a reference beam arriving " +
-    "at 45 degrees, recorded on film and bleached clear, so they delay the light instead of " +
-    "blocking it. It is a sine grating with curved fringes: lit by the reference beam, it " +
-    "bends light straight ahead and focuses it to a spot on the screen, while the leftover " +
-    "light carries on at 45 degrees. " +
+    "A hologram of a point, bleached clear so its fringes delay the light instead of blocking " +
+    "it: a sine grating with curved fringes. Lit by its 45-degree reference beam, it bends " +
+    "light straight ahead and focuses it to a spot on the screen." +
     (params.distance !== FARTHEST
-      ? "Lit by a nearer source than the plane wave it was recorded with, it focuses beyond " +
-        "the screen. "
+      ? " Lit by a nearer source than the plane wave it was recorded with, it focuses beyond " +
+        "the screen."
       : params.angle !== 45
-        ? "Lit at another angle, the light misses the point, and other waves reach the screen. "
-        : "") +
-    "Light it, and it recreates the point.",
+        ? " Lit at another angle, the light misses the point, and other waves reach the screen."
+        : ""),
   point2:
     "Two points recorded on one plate: their fringes add up, and the hologram focuses light to " +
     "both at once. A hologram of an object records every point of it on one plate. A " +

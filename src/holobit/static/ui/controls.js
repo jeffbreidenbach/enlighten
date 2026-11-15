@@ -6,7 +6,7 @@
 // full view. With both plates of a stacked hologram lit and the beam
 // reversed, another button moves the eye between them.
 
-import { APERTURES } from "../physics/aperture.js";
+import { APERTURES, eyeCanMove } from "../physics/aperture.js";
 import {
   DEFAULT_PLATE,
   DEFAULT_WAVELENGTH,
@@ -159,7 +159,7 @@ export function createControls(panel, { onChange }) {
     reverse.setAttribute("aria-pressed", params.reversed);
     eye.textContent = params.eyeHalf > 0 ? "Eye ▲" : "Eye ▼";
     eye.title = `The eye looks through the ${params.eyeHalf > 0 ? "top" : "bottom"} plate`;
-    eye.hidden = !params.reversed || params.aperture !== "stack";
+    eye.hidden = !params.reversed || !eyeCanMove(params.aperture);
   }
 
   // The tour: back and next arrows with the step number between them.

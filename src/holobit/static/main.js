@@ -17,6 +17,7 @@ import { geometry } from "./physics/layout.js";
 import { FIELD_SHADER, SCREEN_SHADER, SCREEN_STEP } from "./physics/wavefield.js";
 import { createControls } from "./ui/controls.js";
 import {
+  eyeFade,
   eyePlace,
   FIELD_ROW_MAX_SHADER,
   ghost,
@@ -133,6 +134,7 @@ const U = {
   uFieldMax: { value: 1 },
   uReversed: { value: false },
   uGhost: { value: 1 },
+  uEyeFade: { value: 1 },
   uEyeY: { value: 0 },
   uFlatTop: { value: false },
 };
@@ -153,7 +155,7 @@ function pass(fragmentShader, uniforms) {
 const fieldPass = pass(FIELD_SHADER, { ...U, uMirror: { value: true } });
 const screenPass = pass(SCREEN_SHADER, { ...U, uMirror: { value: false }, uScreenX: { value: g.screenX } });
 const screenColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uFade: { value: 1 } });
-const retinaColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uReversed: { value: false }, uFade: U.uGhost });
+const retinaColorPass = pass(SCREEN_COLOR_SHADER, { ...U, uReversed: { value: false }, uFade: U.uEyeFade });
 const fieldRowMaxPass = pass(FIELD_ROW_MAX_SHADER, { ...U, uField: { value: fieldRT.texture } });
 const sliceColorPass = pass(SLICE_COLOR_SHADER, {
   ...U,
@@ -332,6 +334,7 @@ function frame(now) {
   uStrip.value = 1 - layout(viewT);
   // Virtual light fades in and out, on the screen too.
   U.uGhost.value = ghost(now / 1000);
+  U.uEyeFade.value = eyeFade(now / 1000);
   if (U.uReversed.value) {
     runPass(screenColorPass, screenColorRT);
     runPass(retinaColorPass, retinaColorRT);

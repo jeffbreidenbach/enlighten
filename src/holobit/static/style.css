@@ -86,6 +86,9 @@ aside {
   border-left: 1px solid rgba(138, 146, 166, 0.3);
   color: #c4c9d4;
   font: 15px/1.45 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  /* At least three lines tall, and the texts are kept within three, so
+     the panel, and the tour's arrows, stay put as the text changes. */
+  min-height: calc(3 * 1.45em);
 }
 
 .row {
