@@ -95,7 +95,7 @@ export const EXPLANATIONS = {
       ? "The beam now comes from the screen's side, travelling back the way it went. A hologram " +
         "lit by its reference beam reversed sends its light back too: light that converged on " +
         "a point now spreads back out as if from that point. That virtual light, which only " +
-        "seems to be there, is drawn in white, on the screen too."
+        "seems to be there, is drawn in white."
       : "The beam comes from the source's side again.",
 
   // Views.

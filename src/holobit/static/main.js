@@ -135,6 +135,11 @@ const U = {
   uReversed: { value: false },
   uGhost: { value: 1 },
   uEyeY: { value: 0 },
+  uRetina: { value: false },
+  uRetinaDot: { value: false },
+  uDotTan: { value: 0 },
+  uImages: { value: null },
+  uImageCount: { value: 0 },
   uFlatTop: { value: false },
 };
 const uPhase = { value: new THREE.Vector2(1, 0) };
@@ -213,6 +218,9 @@ function startCompute() {
   U.uWavelets.value?.dispose();
   U.uWavelets.value = dataTexture(ap.wavelets);
   U.uWaveletCount.value = ap.count;
+  U.uImages.value?.dispose();
+  U.uImages.value = dataTexture(ap.images);
+  U.uImageCount.value = ap.imageCount;
   U.uPlate.value?.dispose();
   U.uPlate.value = ap.plate ? dataTexture(ap.plate.data, ap.plate.cols) : dataTexture(new Float32Array(4));
   U.uPlateRows.value = ap.plate?.rows ?? 0;
@@ -233,16 +241,29 @@ function startCompute() {
   U.uReversed.value = params.reversed;
   const eye = eyePlace(g, ap.seen);
   U.uEyeY.value = eye.y;
-  placeRetina(params.reversed ? eye : null);
+  // Only a hologram's virtual image is at the screen, where the retina's
+  // picture of it assumes it is; the sine grating's is infinitely far.
+  const retina = params.reversed && Boolean(ap.plate);
+  U.uRetina.value = retina;
+  placeRetina(retina ? eye : null);
+  // The sine grating's virtual image is infinitely far: a plane wave,
+  // which the eye's lens brings to a point, if the beam reaches the eye.
+  // It heads back past the plate, rising by the tangent of its angle.
+  const sine = ap.imageSine;
+  const tangent = sine === null || Math.abs(sine) >= 1 ? null : sine / Math.sqrt(1 - sine * sine);
+  const rise = tangent === null ? Infinity : (g.apertureX - eye.x) * tangent;
+  U.uRetinaDot.value = params.reversed && Math.abs(rise - eye.y) < ap.beamHalf;
+  U.uDotTan.value = tangent ?? 0;
 
   // How many wavelet sums each pixel needs: one per slit row, or one per
   // point of a hologram's grid, only half of them in the cross section.
   // With the beam reversed, the columns before the plate need them, and
-  // for a hologram, its virtual light beyond the plate and on the screen;
-  // otherwise the screen gets no light, which takes no summing.
+  // for a hologram or the sine grating, its virtual light beyond the plate
+  // and on the screen; otherwise the screen gets no light, which takes no
+  // summing.
   const { rows, cols } = ap.plate ?? {};
-  const fieldCost = ap.plate ? (rows * (cols + 1)) / 2 : ap.count;
-  const screenCost = ap.plate ? rows * cols : params.reversed ? 1 : ap.count;
+  const fieldCost = ap.plate ? (rows * (cols + 1)) / 2 : ap.count + ap.imageCount;
+  const screenCost = ap.plate ? rows * cols : params.reversed ? Math.max(1, ap.imageCount) : ap.count;
   job = { fieldRow: 0, screenRow: 0, fieldCost, screenCost };
 }
 

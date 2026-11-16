@@ -19,6 +19,9 @@
 //   uWavelets, uWaveletCount, uMode
 //                  the wavelets to sum, and whether they are slit rows or
 //                  a hologram's grid
+//   uImages, uImageCount
+//                  with the beam reversed, the sine grating's image
+//                  light's rows (see imageWavelet in aperture.js)
 //   uPlate, uPlateRows, uPlateCols, uPlateStep, uMirror
 //                  a hologram's grid (see plateSum)
 //   uReversed      whether the light comes from the screen's side instead
@@ -29,10 +32,10 @@
 // section mirrored about the plate. The light leaving the plate then
 // heads away from the screen, and none reaches it. A hologram's image
 // light, though, now seems to come from the screen's side: from its
-// image, a virtual one. That virtual light is the image light the beam
-// the right way round would send there, running backwards: its
-// conjugate. It is worked out alongside, from the image's light on the
-// plate (see plateGrid in aperture.js).
+// image, a virtual one. That virtual light is the image light leaving the
+// plate, run backwards to where it seems to come from: the conjugate of
+// the sum of wavelets sent from the conjugate of that light. It is worked
+// out alongside (see plateGrid in aperture.js).
 
 import { float, HEAD } from "../glsl.js";
 import { MODE_PLATE, ROW_HOLOGRAM, ROW_OPEN } from "./aperture.js";
@@ -41,11 +44,11 @@ import { MODE_PLATE, ROW_HOLOGRAM, ROW_OPEN } from "./aperture.js";
 // height above the axis and p.x the distance out of the cross section.
 const WAVEFIELD = `
 uniform float uK, uCurvature, uApertureX, uWallHalf, uApertureHalf, uCenterY;
-uniform int uMode, uWaveletCount, uPlateRows, uPlateCols;
+uniform int uMode, uWaveletCount, uPlateRows, uPlateCols, uImageCount;
 uniform float uPlateStep;
 uniform bool uMirror, uReversed;
 uniform vec2 uBeamDir;
-uniform sampler2D uRows, uWavelets, uPlate;
+uniform sampler2D uRows, uWavelets, uPlate, uImages;
 
 const float TAU = 6.28318531;
 
@@ -87,7 +90,9 @@ vec2 incident(float x, vec2 p) {
 vec2 slitRow(vec4 w, float dx, vec2 p) {
   float rowY = w.x;
   float r = length(vec2(dx, p.y - rowY));
-  float spread = sqrt(r / (1.0 + w.w * r));
+  // (Virtual light curves the other way, and may focus; abs keeps it
+  // finite there.)
+  float spread = sqrt(r / max(abs(1.0 + w.w * r), 1e-3));
   return spread * cmul(w.yz, wavelet(r, dx));
 }
 
@@ -133,10 +138,19 @@ vec2 lightAt(float x, vec2 p) {
   return u;
 }
 
-// The virtual light at x beyond the plate, with the beam reversed.
+// The virtual light at x beyond the plate, with the beam reversed: from
+// a hologram's grid, or the sine grating's rows (uImages).
 vec2 virtualAt(float x, vec2 p) {
-  if (uMode != ${MODE_PLATE} || x <= uApertureX + uWallHalf) return vec2(0.0);
-  vec2 u = plateSum(x - uApertureX, p, true);
+  if (x <= uApertureX + uWallHalf) return vec2(0.0);
+  float dx = x - uApertureX;
+  vec2 u = vec2(0.0);
+  if (uMode == ${MODE_PLATE}) {
+    u = plateSum(dx, p, true);
+  } else {
+    for (int i = 0; i < uImageCount; i++) {
+      u += slitRow(texelFetch(uImages, ivec2(i, 0), 0), dx, p);
+    }
+  }
   return vec2(u.x, -u.y);
 }`;
 

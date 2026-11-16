@@ -163,6 +163,8 @@ float wave(vec2 u) {
 // the iris, which is open in the middle for the pupil. Returns its
 // brightness and how much it covers.
 uniform float uEyeY;
+// Whether the eye's retina shows the virtual image (see main.js).
+uniform bool uRetina;
 
 // How strongly a line drawn at distance d covers a pixel.
 float line(float d) {
@@ -216,6 +218,21 @@ float retina(vec2 c) {
   if (row < 0 || row >= textureSize(uScreen, 0).y) return 0.0;
   float i = texelFetch(uScreen, ivec2(int(uCenterY / STEP), row), 0).b;
   return clamp(i / uMaxIntensity, 0.0, 1.0);
+}
+
+// The point a plane wave virtual image, infinitely far, focuses to on the
+// retina: the sine grating's (uRetinaDot), arriving rising by uDotTan;
+// the lens turns it over, so the point is above the middle by that
+// tangent times the lens's distance to the retina.
+uniform bool uRetinaDot;
+uniform float uDotTan;
+float retinaDot(vec2 c) {
+  float r = ${float(EYE_RADIUS)} * uScale;
+  float x = uApertureX - ${float(EYE_BACK)} * uScale;
+  float lensX = x + ${float(LENS)} * r;
+  float back = x - r + ${float(RETINA_IN)} * uScale;
+  vec2 at = vec2(back, uCenterY + uEyeY + uDotTan * (lensX - back));
+  return 1.0 - smoothstep(1.5 * uScale, 2.5 * uScale, distance(c, at));
 }
 
 // The light before the plate is drawn as a beam aimed at it: it shows only
@@ -278,7 +295,8 @@ void main() {
     if (uReversed) {
       vec2 e = eye(c);
       rgb = mix(rgb, ${vec3(VIRTUAL)} * e.x, e.y * uGhost);
-      rgb = max(rgb, uHue * retina(c) * uGhost);
+      if (uRetina) rgb = max(rgb, uHue * retina(c) * uGhost);
+      if (uRetinaDot) rgb = max(rgb, uHue * retinaDot(c) * uGhost);
     }
   } else {
     // The screen strip, from the screen on: the center line of the screen

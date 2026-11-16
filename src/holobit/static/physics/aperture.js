@@ -155,6 +155,17 @@ export function eyeCanMove(name) {
 // about a third of it.
 const BLEACH = 1.84;
 
+// The Bessel function J1, from its series, for x up to about BLEACH.
+function besselJ1(x) {
+  let term = x / 2;
+  let sum = term;
+  for (let m = 1; m < 10; m++) {
+    term *= -(x * x) / (4 * m * (m + 1));
+    sum += term;
+  }
+  return sum;
+}
+
 // The grid of points a hologram is sampled at, in base cells: a quarter
 // of a wavelength apart at 550 nm. Waves leaving the hologram at steep
 // angles need the grid this fine, or they would be mistaken for waves at
@@ -324,6 +335,8 @@ function arriving(g, y, z = 0) {
 // - seen: the height of the middle of the part of the plate the eye looks
 //   through when the beam is reversed.
 // - gap: how tall the gap between a stacked plate's two halves is.
+// - images, imageCount, imageSine: with the beam reversed, the sine
+//   grating's image light (see imageWavelet), and its direction.
 // Light is scaled so the incoming wave has strength 1 and phase 0 at the
 // plate's center.
 export function aperture(params, g) {
@@ -336,6 +349,9 @@ export function aperture(params, g) {
   const block = new Float32Array(g.H);
   const depth = new Float32Array(g.H);
   const list = [];
+  // With the beam reversed, the sine grating's image light (see images).
+  const imageList = [];
+  const grating = params.aperture === "grating";
 
   for (let row = 0; row < g.H; row++) {
     const y = row - g.centerY;
@@ -354,8 +370,9 @@ export function aperture(params, g) {
 
     // How much of the arriving light this row lets through.
     let pass;
-    if (params.aperture === "grating") {
+    if (grating) {
       pass = 0.5 + 0.5 * Math.cos((2 * Math.PI * y) / (GRATING_PERIOD * g.scale));
+      if (params.reversed) imageList.push(imageWavelet(g, y));
     } else {
       const open = SLITS[params.aperture].some(
         ([center, half]) => Math.abs(y - center * g.scale) <= half * g.scale,
@@ -374,18 +391,20 @@ export function aperture(params, g) {
     list.push([y, strength * amplitude, g.k * delay - Math.PI / 4, curvature]);
   }
 
-  const wavelets = new Float32Array(Math.max(list.length, 1) * 4);
-  list.forEach(([pos, strength, phase, extra], i) => {
-    wavelets.set([pos, strength * Math.cos(phase), strength * Math.sin(phase), extra], i * 4);
-  });
   return {
     mode: plate ? MODE_PLATE : MODE_SLITS,
     kind,
     block,
     depth,
     plate,
-    wavelets,
+    wavelets: packWavelets(list),
     count: list.length,
+    images: packWavelets(imageList),
+    imageCount: imageList.length,
+    // The sine of the angle the sine grating's image light leaves at,
+    // with the beam reversed, across the axis (see imageWavelet); else
+    // null.
+    imageSine: imageList.length ? g.beamDir[1] - (2 * Math.PI) / (GRATING_PERIOD * g.scale * g.k) : null,
     height,
     lit: [hologram?.lit > 0 ? 0 : -height / 2, hologram?.lit < 0 ? 0 : height / 2],
     beamGap: hologram?.stacked && !hologram.wide ? g.apertureSize / 2 : 0,
@@ -394,6 +413,36 @@ export function aperture(params, g) {
     seen: (seen * g.apertureSize) / 2,
     gap: hologram?.stacked ? DIVIDER * g.scale : 0,
   };
+}
+
+// Wavelets [row height, strength, phase, curvature] packed for the GPU
+// as [height, re, im, curvature].
+function packWavelets(list) {
+  const out = new Float32Array(Math.max(list.length, 1) * 4);
+  list.forEach(([pos, strength, phase, extra], i) => {
+    out.set([pos, strength * Math.cos(phase), strength * Math.sin(phase), extra], i * 4);
+  });
+  return out;
+}
+
+// The sine grating's image light, with the beam reversed, from the row at
+// height y: what virtual light is worked out from (see virtualAt in
+// wavefield.js). The grating's transparency, 1/2 + 1/2 cos(G y), is 1/2
+// plus 1/4 e^(iGy) plus 1/4 e^(-iGy): three plane waves leave it. The
+// beam reversed is the reference beam's exact reverse, and the one the
+// film's e^(-iGy) turns back along the axis, toward the viewer, is the
+// image: the reverse of the light the grating was recorded from, a plane
+// wave from far away, its virtual image at infinity. As for a hologram
+// (see plateGrid), what is kept is that light's conjugate, made into a
+// source again: its row's wavelet, phase negated, lagging a further 90
+// degrees (the strip's 45 degree lag conjugated), and its light curving
+// the other way.
+function imageWavelet(g, y) {
+  const G = (2 * Math.PI) / (GRATING_PERIOD * g.scale);
+  const { amplitude, delay, curvature } = arriving(g, y);
+  const strength = Math.sqrt(g.k / (2 * Math.PI)) * 0.25 * beamProfile(g, y) * amplitude;
+  const phase = g.k * delay - Math.PI / 4 - G * y;
+  return [y, strength, -phase - Math.PI / 2, -curvature];
 }
 
 // How far a hologram delays the light at (z, y) on the plate, 0 to 1,
@@ -411,14 +460,19 @@ export function shade(plate, z, y) {
 // across the middle.
 //
 // With the beam reversed, each point of the part of the plate the eye
-// looks through, `seen`, also holds, in its last two values, the light
-// the image alone would leave with under the beam the right way round: what arrives there times the conjugate of the object's
-// light, so that it converges on the object. Its conjugate, the same
-// light running backwards, is the virtual light the reversed beam's light
-// seems to come from. g is then the mirrored geometry (see wavefield.js),
-// so the beam the right way round arrives at height -y where the mirrored
-// one arrives at y. (Virtual light is where light seems to come from to
-// a viewer, so only the light that reaches the eye has it.)
+// looks through, `seen`, also holds, in its last two values, what the
+// virtual light is worked out from (see virtualAt in wavefield.js). Of
+// the light the plate sends out, the image's is the part that varies as
+// the object's light does: by the Jacobi-Anger expansion of the film's
+// delay, BLEACH times the exposure (the real part of the object's light,
+// L), it is i J1(BLEACH |L|) in the direction of L. Run backwards, that
+// light is the virtual light, so these hold the conjugate of what it
+// leaves with, made into a source again: negated, since the 90 degree lag
+// conjugates to a lead. It is the beam that actually lights the plate
+// that sets it, so a beam that is not the reference's exact reverse, from
+// a point source, sends out a blurred image, as it would. (Virtual light
+// is where light seems to come from to a viewer, so only the light that
+// reaches the eye has it.)
 function plateGrid(g, hologram, reversed, seen) {
   const step = PLATE_STEP * g.scale;
   const colMid = Math.floor(g.apertureSize / 2 / step);
@@ -447,10 +501,13 @@ function plateGrid(g, hologram, reversed, seen) {
       const phase = g.k * delay + BLEACH * exposure[at] - Math.PI / 2;
       data.set([strength * Math.cos(phase), strength * Math.sin(phase)], at * 4);
       if (!reversed || !inPart(seen, y)) continue;
-      const forward = g.k * arriving(g, -y, z).delay - Math.PI / 2;
-      const [re, im] = [light[2 * at], -light[2 * at + 1]];
-      const [c, s] = [strength * Math.cos(forward), strength * Math.sin(forward)];
-      data.set([re * c - im * s, re * s + im * c], at * 4 + 2);
+      const [re, im] = [light[2 * at], light[2 * at + 1]];
+      const size = Math.hypot(re, im);
+      if (size === 0) continue;
+      const image = (strength * besselJ1(BLEACH * size)) / size;
+      const lead = g.k * delay;
+      const [c, s] = [Math.cos(lead), Math.sin(lead)];
+      data.set([-image * (re * c - im * s), image * (re * s + im * c)], at * 4 + 2);
     }
   }
   return { ...grid, data, exposure };
