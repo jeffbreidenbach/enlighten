@@ -3,6 +3,8 @@
 An interactive, browser-based light simulator for teaching the ideas behind holography, from
 diffraction at a single slit toward holographic stereograms.
 
+**Try it: https://jeffbreidenbach.github.io/enlighten/**
+
 ![The guided tour, from a single slit to a holographic stereogram](docs/tour.webp)
 
 It shows light as a steady wave of one color passing a source, an aperture plate and a screen:
@@ -24,9 +26,12 @@ The light is computed by summing Huygens wavelets from the aperture plate in Web
 
 ## Run
 
-The simulator is a folder of static files, `src/enlighten/static/`, with nothing to build or
-install: `index.html` is the whole app. Browsers will not load its scripts straight from disk
-(a `file://` address), so serve the folder with any web server and point a browser at it:
+The quickest way is the copy on the web: https://jeffbreidenbach.github.io/enlighten/
+
+To run your own, the simulator is a folder of static files, `src/enlighten/static/`, with
+nothing to build or install: `index.html` is the whole app. Browsers will not load its scripts
+straight from disk (a `file://` address), so serve the folder with any web server and point a
+browser at it:
 
 ```bash
 cd src/enlighten/static
