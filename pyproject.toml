@@ -1,5 +1,5 @@
 [project]
-name = "holobit"
+name = "enlighten"
 version = "0.1.0"
 description = "Browser-based light simulator for teaching holography"
 readme = "README.md"
@@ -7,7 +7,7 @@ requires-python = ">=3.14"
 dependencies = []
 
 [project.scripts]
-holobit = "holobit:main"
+enlighten = "enlighten:main"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]

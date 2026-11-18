@@ -4,8 +4,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 STATIC_DIR = Path(__file__).parent / "static"
-# The app is served under this path, e.g. http://host:8000/holobit/.
-PREFIX = "/holobit"
+# The app is served under this path, e.g. http://host:8000/enlighten/.
+PREFIX = "/enlighten"
 
 
 class StaticHandler(SimpleHTTPRequestHandler):

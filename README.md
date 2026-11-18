@@ -1,4 +1,4 @@
-# holobit
+# enlighten
 
 An interactive, browser-based light simulator for teaching the ideas behind holography, from
 diffraction at a single slit toward holographic stereograms.
@@ -19,16 +19,16 @@ The light is computed by summing Huygens wavelets from the aperture plate in Web
 ## Run
 
 ```bash
-uv run holobit
+uv run enlighten
 ```
 
-Then open http://localhost:8000/holobit/. The server listens on all interfaces (`0.0.0.0`) on
+Then open http://localhost:8000/enlighten/. The server listens on all interfaces (`0.0.0.0`) on
 port 8000; set `HOST` (for example `HOST=127.0.0.1` to keep it private) and `PORT` to change that.
 
 ## Layout
 
-- `src/holobit/__init__.py`: a small static file server.
-- `src/holobit/static/`: the simulator.
+- `src/enlighten/__init__.py`: a small static file server.
+- `src/enlighten/static/`: the simulator.
   - `physics/`: the core calculation.
     - `layout.js`: where everything sits, and the scale.
     - `aperture.js`: turns each aperture into the wavelets it sends on.
